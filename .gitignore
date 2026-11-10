@@ -1,3 +1,14 @@
+# Ambiente virtual e cache do Python
 .venv
 __pycache__*
+
+# Arquivos locais com segredos
 .env
+
+# Banco de dados e logs gerados em tempo de execução
+data/*.db
+data/*.db-*
+*.log
+
+# Cache de testes
+.pytest_cache/
