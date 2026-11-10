@@ -55,3 +55,5 @@ pip install -r requirements.txt
 ```
 
 Tradução em docs/development
+
+Todo: add guia de utilização do software
