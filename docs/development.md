@@ -97,3 +97,61 @@ Blibliotecas utilizadas:
 ### Milestone 7 - Integração + hardening
 - Testes end-to-end de fixtures.
 - Verificar envio, regreas de dominios, timeouts, e falhas graciosas em Ollama.
+
+# Fluxo da aplicação
+
+```text
++--------------------------------------------------+
+|                    USUARIO                       |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|                   INTERFACE                      | 
+|                                                  |
+|  - Enviar URL de website                         |
+|  - Providenciar Instruções                       |
+|  - Gerenciamento de informações de usuario       |
+|  - Revisão de funcionamento de agente            |
+|  - Aprovação e envio de edital                   |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|            CONTROLADOR DE AGENTE                 |
+|                                                  |
+|  - Recebe instruções de usuario                  |
+|  - Gerencia fluxo de execução                    |
+|  - Cordenação de componentes                     |
+|  - Controle de estados de execução               |
++--------------------------------------------------+
+          |                |               |
+          v                v               v
++----------------+ +---------------+ +----------------+
+|     AGENTE     | |    MEMORIA    | |   SEGURANÇA    |
+|                | |               | |                |
+|    Ollama      | |    SQLite     | | Validação      |
+|                | |               | | Permissões     |
+| Raciocino      | | Dados         | | Restrições     |
+| Mapeamento     | | Histórico     | | Aprovações     |
++----------------+ +---------------+ +----------------+
+          |
+          v
++--------------------------------------------------+
+|              AUTOMAÇÃO DE NAVEGADOR              |
+|                                                  |
+|                  Playwright                      |
+|                                                  |
+|  - Navegar Sites                                 |
+|  - Inspecionar HTML                              |
+|  - Identificar campos de editais                 |
+|  - Preencher campos                              |
+|  - Verificação de informações preenchidas        |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|                  SITE DE EDITAL                  |
++--------------------------------------------------+
+```
+Fluxograma feito no kolourpaint, transformado em ASCII com I.A
