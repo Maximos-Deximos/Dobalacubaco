@@ -13,6 +13,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.logging_config import configure_logging
 from app.memory.database import init_db
+from app.ui.browser_cli import command_inspect
 from app.ui.cli import (
     command_profile_init,
     command_profile_set,
@@ -134,6 +135,25 @@ def _add_profile_parser(subparsers: argparse._SubParsersAction) -> None:
     profile_set.set_defaults(func=command_profile_set)
 
 
+# Registra o subcomando de inspeção de formulários.
+def _add_inspect_parser(subparsers: argparse._SubParsersAction) -> None:
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="inspeciona os campos de formulário de uma URL HTTPS",
+    )
+    inspect_parser.add_argument(
+        "url",
+        help="URL HTTPS do formulário",
+    )
+    inspect_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    inspect_parser.set_defaults(func=command_inspect)
+
+
 # Monta o parser principal da CLI.
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -155,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.set_defaults(func=command_doctor)
 
     _add_profile_parser(subparsers)
+    _add_inspect_parser(subparsers)
 
     return parser
 
