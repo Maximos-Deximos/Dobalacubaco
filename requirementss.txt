@@ -1,0 +1,9 @@
+ollama
+playwright
+pydantic
+sqlalchemy
+python-dotenv
+fastapi
+uvicorn[standard]
+pytest
+pytest-asyncio

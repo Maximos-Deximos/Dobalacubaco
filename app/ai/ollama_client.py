@@ -1,0 +1,1 @@
+# Programa deve ser reponsavel pela comunicação com a I.A local

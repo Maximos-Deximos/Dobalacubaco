@@ -1,0 +1,1 @@
+# Esse programa deve ser reponsavel pela inspeção estrutural so site
