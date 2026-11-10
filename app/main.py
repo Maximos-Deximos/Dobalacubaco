@@ -13,6 +13,11 @@ from pathlib import Path
 from app.config import get_settings
 from app.logging_config import configure_logging
 from app.memory.database import init_db
+from app.ui.cli import (
+    command_profile_init,
+    command_profile_set,
+    command_profile_show,
+)
 
 
 # Verifica se o serviço Ollama responde e se o modelo está instalado.
@@ -87,11 +92,53 @@ def command_doctor(_args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+# Registra os subcomandos de perfil.
+def _add_profile_parser(subparsers: argparse._SubParsersAction) -> None:
+    profile = subparsers.add_parser(
+        "profile",
+        help="gerencia o perfil local",
+    )
+    profile_subparsers = profile.add_subparsers(
+        dest="profile_command",
+        required=True,
+    )
+
+    profile_init = profile_subparsers.add_parser(
+        "init",
+        help="cria o perfil padrão",
+    )
+    profile_init.set_defaults(func=command_profile_init)
+
+    profile_show = profile_subparsers.add_parser(
+        "show",
+        help="exibe o perfil padrão",
+    )
+    profile_show.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o perfil em JSON",
+    )
+    profile_show.set_defaults(func=command_profile_show)
+
+    profile_set = profile_subparsers.add_parser(
+        "set",
+        help="atualiza o perfil padrão",
+    )
+    profile_set.add_argument(
+        "assignments",
+        nargs="+",
+        metavar="CHAVE=VALOR",
+        help="campos no formato chave=valor",
+    )
+    profile_set.set_defaults(func=command_profile_set)
+
+
 # Monta o parser principal da CLI.
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="dobalacubaco",
-        description="Agente local para preenchimento de formulários.",
+        prog="agente_editais_ia",
+        description="Agente local para preenchimento de editais.",
     )
     parser.add_argument(
         "--debug",
@@ -100,11 +147,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
+
     doctor = subparsers.add_parser(
         "doctor",
         help="verifica configuração, banco, Ollama e Playwright",
     )
     doctor.set_defaults(func=command_doctor)
+
+    _add_profile_parser(subparsers)
 
     return parser
 
