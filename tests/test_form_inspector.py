@@ -81,7 +81,7 @@ async def test_warns_about_file_field(forms_page) -> None:
     result = await FormDetector().detect(forms_page, snapshot)
 
     upload = next(field for field in result.fields if field.name == "upload")
-    assert upload.field_type == FieldType.UNKNOWN
+    assert upload.field_type == FieldType.FILE
     assert any("arquivo" in warning.lower() for warning in result.warnings)
 
 
@@ -111,6 +111,46 @@ async def test_detects_robotics_fields(forms_page) -> None:
     selectors = [field.selector for field in result.fields]
     assert len(field_ids) == len(set(field_ids))
     assert len(selectors) == len(set(selectors))
+
+
+# Prioriza aria-labelledby em vez do aria-label genérico de resposta.
+@pytest.mark.browser
+async def test_prefers_labelledby_over_generic_answer_label(forms_page) -> None:
+    await forms_page.set_content(
+        """
+        <html><body>
+          <div role="heading" id="question">Descreva sua experiência</div>
+          <textarea aria-label="Sua resposta" aria-labelledby="question"></textarea>
+        </body></html>
+        """
+    )
+
+    snapshot = await PageInspector().inspect(forms_page)
+    result = await FormDetector().detect(forms_page, snapshot)
+
+    assert result.fields[0].label == "Descreva sua experiência"
+
+
+# Lê data-required de contêineres de grupos no detector genérico.
+@pytest.mark.browser
+async def test_reads_required_from_group_container(forms_page) -> None:
+    await forms_page.set_content(
+        """
+        <html><body>
+          <div role="heading" id="question">Escolha uma opção</div>
+          <div role="radiogroup" aria-labelledby="question" data-required="true">
+            <div role="radio" aria-label="A" data-value="a"></div>
+            <div role="radio" aria-label="B" data-value="b"></div>
+          </div>
+        </body></html>
+        """
+    )
+
+    snapshot = await PageInspector().inspect(forms_page)
+    result = await FormDetector().detect(forms_page, snapshot)
+
+    assert result.fields[0].required is True
+    assert result.fields[0].required_source == "data-required"
 
 
 # Garante que uma página sem campos retorna lista vazia e aviso.

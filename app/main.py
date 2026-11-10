@@ -151,6 +151,12 @@ def _add_inspect_parser(subparsers: argparse._SubParsersAction) -> None:
         dest="json_output",
         help="exibe o resultado em JSON",
     )
+    inspect_parser.add_argument(
+        "--debug",
+        action="store_true",
+        dest="debug_output",
+        help="exibe todos os detalhes dos campos detectados",
+    )
     inspect_parser.set_defaults(func=command_inspect)
 
 

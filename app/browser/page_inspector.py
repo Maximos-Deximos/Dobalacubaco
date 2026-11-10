@@ -89,7 +89,7 @@ class PageInspector:
         warnings: list[str] = []
         if iframe_urls:
             warnings.append(
-                "A página contém iframes; apenas o frame principal será analisado."
+                "A página contém iframes; frames compatíveis também serão inspecionados."
             )
 
         return PageSnapshot(

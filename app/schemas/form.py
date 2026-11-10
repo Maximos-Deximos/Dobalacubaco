@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -13,12 +14,16 @@ class FieldType(str, Enum):
     EMAIL = "email"
     TEL = "tel"
     NUMBER = "number"
+    URL = "url"
     DATE = "date"
+    TIME = "time"
     TEXTAREA = "textarea"
     SELECT = "select"
     RADIO = "radio"
     CHECKBOX = "checkbox"
     CONSENT = "consent"
+    FILE = "file"
+    GRID = "grid"
     UNKNOWN = "unknown"
 
 
@@ -29,6 +34,28 @@ class FieldStatus(str, Enum):
     SKIPPED = "skipped"
     FILLED = "filled"
     FAILED = "failed"
+
+
+# Opção individual de um campo de escolha.
+class FieldOption(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    label: str
+    value: str | None = None
+    selector: str | None = None
+    disabled: bool = False
+
+
+# Subcampo usado por datas, horas e grids com múltiplos controles.
+class DetectedSubField(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    subfield_id: str
+    label: str = ""
+    field_type: FieldType = FieldType.UNKNOWN
+    selector: str
+    required: bool = False
+    options: list[FieldOption] = Field(default_factory=list)
 
 
 # Campo encontrado no DOM, sem qualquer decisão da IA.
@@ -42,10 +69,20 @@ class DetectedField(BaseModel):
     required: bool = False
     options: list[str] = Field(default_factory=list)
     option_values: list[str] = Field(default_factory=list)
+    option_details: list[FieldOption] = Field(default_factory=list)
+    subfields: list[DetectedSubField] = Field(default_factory=list)
     placeholder: str | None = None
     name: str | None = None
     input_type: str | None = None
     group_name: str | None = None
+    description: str = ""
+    help_text: str = ""
+    section_title: str = ""
+    question_number: str | None = None
+    constraints: dict[str, Any] = Field(default_factory=dict)
+    required_source: str | None = None
+    adapter: str = "generic"
+    frame_url: str | None = None
     visible: bool = True
     disabled: bool = False
     readonly: bool = False
@@ -58,7 +95,15 @@ class PageSnapshot(BaseModel):
     url: str
     title: str = ""
     form_count: int = 0
+    form_title: str = ""
+    form_description: str = ""
+    section_title: str = ""
+    section_description: str = ""
+    page_index: int = 1
+    has_next: bool = False
+    is_google_form: bool = False
     iframe_urls: list[str] = Field(default_factory=list)
+    inspected_frames: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
