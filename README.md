@@ -54,6 +54,10 @@ PS C:\> <venv>\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
+## Usage
+
+- Run `python3 -m app.main` on the virtual enviroment for TUI
+
 Tradução em docs/development
 
 Todo: add guia de utilização do software

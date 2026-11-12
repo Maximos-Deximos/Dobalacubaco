@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import os
 import sys
-from pathlib import Path
 
-from app.ai.ollama_client import OllamaClient, OllamaError
+from app.application.diagnostics_service import (
+    check_ollama as _check_ollama_impl,
+)
+from app.application.diagnostics_service import run_diagnostics
 from app.config import get_settings
 from app.logging_config import configure_logging
-from app.memory.database import init_db
 from app.ui.browser_cli import command_inspect
 from app.ui.chat_cli import (
     command_chat_ask,
@@ -44,102 +43,26 @@ from app.ui.workspace_cli import (
 )
 
 
-# Compara nomes de modelos tratando a tag implícita ":latest" como equivalente.
-def _model_installed(model: str, installed: set[str]) -> bool:
-    normalized = model.removesuffix(":latest")
-    return any(name.removesuffix(":latest") == normalized for name in installed)
-
-
-# Verifica se os modelos de chat e embedding estão instalados.
+# Mantém o nome histórico usado por testes e integrações.
 def _check_ollama(
     host: str,
     timeout: int,
     model: str,
     embed_model: str,
 ) -> tuple[bool, str, bool, str]:
-    try:
-        names = set(
-            OllamaClient(host=host, timeout=timeout).list_models()
-        )
-    except OllamaError as exc:
-        detail = f"não foi possível consultar o Ollama em {host}: {exc}"
-        return False, detail, False, detail
-
-    chat_ok = _model_installed(model, names)
-    chat_detail = (
-        f"modelo '{model}' disponível"
-        if chat_ok
-        else f"modelo '{model}' ausente; execute: ollama pull {model}"
-    )
-
-    if not embed_model:
-        embed_ok = True
-        embed_detail = "modelo de embedding não configurado; busca lexical ativa"
-    else:
-        embed_ok = _model_installed(embed_model, names)
-        embed_detail = (
-            f"modelo '{embed_model}' disponível"
-            if embed_ok
-            else f"modelo '{embed_model}' ausente; execute: ollama pull {embed_model}"
-        )
-
-    return chat_ok, chat_detail, embed_ok, embed_detail
-
-
-# Verifica se o pacote e os navegadores do Playwright estão instalados.
-def _check_playwright() -> tuple[bool, str]:
-    if importlib.util.find_spec("playwright") is None:
-        return False, "pacote playwright não instalado"
-
-    browser_root = Path(
-        os.environ.get(
-            "PLAYWRIGHT_BROWSERS_PATH",
-            str(Path.home() / ".cache" / "ms-playwright"),
-        )
-    )
-    if not browser_root.exists() or not any(browser_root.iterdir()):
-        return False, "navegadores ausentes; execute: playwright install chromium"
-
-    return True, f"navegadores em {browser_root}"
+    return _check_ollama_impl(host, timeout, model, embed_model)
 
 
 # Executa verificações básicas de instalação e configuração.
 def command_doctor(_args: argparse.Namespace) -> int:
-    settings = get_settings()
-    checks: list[tuple[str, bool, str]] = []
-
-    def add_check(name: str, ok: bool, detail: str) -> None:
-        checks.append((name, ok, detail))
-
-    add_check("configuração", True, f"modelo={settings.ollama_model}")
-
-    try:
-        init_db()
-        add_check("banco de dados", True, settings.database_url)
-    except Exception as exc:  # noqa: BLE001
-        add_check("banco de dados", False, str(exc))
-
-    data_dir_ok = settings.data_dir.exists() and os.access(settings.data_dir, os.W_OK)
-    add_check("diretório de dados", data_dir_ok, str(settings.data_dir))
-
-    ollama_ok, ollama_detail, embed_ok, embed_detail = _check_ollama(
-        settings.ollama_host,
-        settings.ollama_timeout,
-        settings.ollama_model,
-        settings.ollama_embed_model,
-    )
-    add_check("ollama", ollama_ok, ollama_detail)
-    add_check("embedding", embed_ok, embed_detail)
-
-    playwright_ok, playwright_detail = _check_playwright()
-    add_check("playwright", playwright_ok, playwright_detail)
+    checks = run_diagnostics(get_settings())
 
     failed = False
-    for name, ok, detail in checks:
-        status = "OK" if ok else "FALHA"
-        if not ok:
+    for check in checks:
+        status = "OK" if check.ok else "FALHA"
+        if not check.ok:
             failed = True
-        print(f"[{status:5}] {name}: {detail}")
+        print(f"[{status:5}] {check.name}: {check.detail}")
 
     return 1 if failed else 0
 

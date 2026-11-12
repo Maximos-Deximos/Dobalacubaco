@@ -3,24 +3,18 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import sys
 
-from app.browser.browser_manager import BrowserLaunchError, BrowserManager
-from app.browser.form_detector import FormDetector
-from app.browser.page_inspector import (
-    InvalidUrlError,
-    NavigationError,
-    PageInspector,
-    validate_url,
-)
+from app.application.inspection_service import InspectionService
+from app.browser.browser_manager import BrowserLaunchError
+from app.browser.page_inspector import InvalidUrlError, NavigationError
 from app.schemas.form import DetectionResult
 
 
 # Executa a inspeção e imprime o resultado.
 def command_inspect(args: argparse.Namespace) -> int:
     try:
-        result = asyncio.run(_inspect_url(args.url))
+        result = InspectionService().inspect_sync(args.url)
     except (InvalidUrlError, NavigationError, BrowserLaunchError) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
@@ -36,18 +30,6 @@ def command_inspect(args: argparse.Namespace) -> int:
         _print_result(result)
 
     return 0
-
-
-# Executa navegação e detecção dentro do ciclo assíncrono.
-async def _inspect_url(url: str) -> DetectionResult:
-    safe_url = validate_url(url)
-
-    async with BrowserManager() as manager:
-        page = await manager.new_page()
-        inspector = PageInspector()
-        snapshot = await inspector.navigate(page, safe_url)
-        detector = FormDetector()
-        return await detector.detect(page, snapshot)
 
 
 # Imprime um resumo legível dos campos detectados.
