@@ -38,7 +38,7 @@ class WorkspaceRepository:
             )
             if existing is not None:
                 raise WorkspaceAlreadyExistsError(
-                    f"Já existe um workspace chamado '{data.name}'."
+                    f"Já existe uma área de trabalho chamada '{data.name}'."
                 )
 
             model = WorkspaceModel(**data.model_dump(mode="json"))
@@ -47,7 +47,7 @@ class WorkspaceRepository:
                 session.flush()
             except IntegrityError as exc:
                 raise WorkspaceAlreadyExistsError(
-                    f"Já existe um workspace chamado '{data.name}'."
+                    f"Já existe uma área de trabalho chamada '{data.name}'."
                 ) from exc
             return _to_schema(model)
 
@@ -57,7 +57,7 @@ class WorkspaceRepository:
             model = session.get(WorkspaceModel, workspace_id)
             if model is None:
                 raise WorkspaceNotFoundError(
-                    f"Workspace {workspace_id} não encontrado."
+                    f"Área de trabalho {workspace_id} não encontrada."
                 )
             return _to_schema(model)
 

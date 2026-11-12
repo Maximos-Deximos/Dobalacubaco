@@ -23,6 +23,13 @@ from app.ui.cli import (
     command_profile_set,
     command_profile_show,
 )
+from app.ui.help_cli import command_help
+from app.ui.proposal_cli import (
+    command_proposal_list,
+    command_proposal_new,
+    command_proposal_outline,
+    command_proposal_show,
+)
 from app.ui.source_cli import (
     command_source_add,
     command_source_add_file,
@@ -135,6 +142,141 @@ def command_doctor(_args: argparse.Namespace) -> int:
         print(f"[{status:5}] {name}: {detail}")
 
     return 1 if failed else 0
+
+
+# Abre a TUI em um import tardio para não pesar os comandos simples.
+def _open_tui() -> int:
+    from app.tui.app import run_tui
+
+    return run_tui()
+
+
+# Executa o subcomando explícito da TUI.
+def command_tui(_args: argparse.Namespace) -> int:
+    return _open_tui()
+
+
+# Registra o subcomando de ajuda.
+def _add_help_parser(subparsers: argparse._SubParsersAction) -> None:
+    help_parser = subparsers.add_parser(
+        "help",
+        help="exibe a ajuda geral ou de um comando",
+    )
+    help_parser.add_argument(
+        "topic",
+        nargs="*",
+        help="comando ou grupo de comandos",
+    )
+    help_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="show_all",
+        help="exibe a ajuda detalhada de todos os comandos",
+    )
+    help_parser.set_defaults(func=command_help)
+
+
+# Registra o subcomando da interface de terminal.
+def _add_tui_parser(subparsers: argparse._SubParsersAction) -> None:
+    tui_parser = subparsers.add_parser(
+        "tui",
+        help="abre a interface de terminal",
+    )
+    tui_parser.set_defaults(func=command_tui)
+
+
+# Registra os subcomandos de proposta.
+def _add_proposal_parser(subparsers: argparse._SubParsersAction) -> None:
+    proposal = subparsers.add_parser(
+        "proposal",
+        help="cria e consulta propostas de solução",
+    )
+    proposal_subparsers = proposal.add_subparsers(
+        dest="proposal_command",
+        required=True,
+    )
+
+    proposal_new = proposal_subparsers.add_parser(
+        "new",
+        help="cria uma proposta com a estrutura inicial",
+    )
+    proposal_new.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    proposal_new.add_argument(
+        "--title",
+        required=True,
+        help="título da proposta",
+    )
+    proposal_new.add_argument(
+        "--description",
+        default="",
+        help="descrição da proposta",
+    )
+    proposal_new.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    proposal_new.set_defaults(func=command_proposal_new)
+
+    proposal_list = proposal_subparsers.add_parser(
+        "list",
+        help="lista as propostas",
+    )
+    proposal_list.add_argument(
+        "--workspace",
+        type=int,
+        default=None,
+        dest="workspace_id",
+        help="filtra por workspace",
+    )
+    proposal_list.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    proposal_list.set_defaults(func=command_proposal_list)
+
+    proposal_show = proposal_subparsers.add_parser(
+        "show",
+        help="exibe uma proposta e suas seções",
+    )
+    proposal_show.add_argument(
+        "proposal_id",
+        type=int,
+        help="ID da proposta",
+    )
+    proposal_show.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    proposal_show.set_defaults(func=command_proposal_show)
+
+    proposal_outline = proposal_subparsers.add_parser(
+        "outline",
+        help="exibe o sumário de seções da proposta",
+    )
+    proposal_outline.add_argument(
+        "proposal_id",
+        type=int,
+        help="ID da proposta",
+    )
+    proposal_outline.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    proposal_outline.set_defaults(func=command_proposal_outline)
 
 
 # Registra os subcomandos de perfil.
@@ -456,7 +598,7 @@ def _add_chat_parser(subparsers: argparse._SubParsersAction) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agente_editais_ia",
-        description="Agente local para preenchimento de editais.",
+        description="Agente local para editais e propostas de solução.",
     )
     parser.add_argument(
         "--debug",
@@ -472,19 +614,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor.set_defaults(func=command_doctor)
 
+    _add_help_parser(subparsers)
+    _add_tui_parser(subparsers)
     _add_profile_parser(subparsers)
     _add_inspect_parser(subparsers)
     _add_workspace_parser(subparsers)
     _add_source_parser(subparsers)
     _add_chat_parser(subparsers)
+    _add_proposal_parser(subparsers)
 
     return parser
 
 
 # Executa o comando escolhido pelo usuário.
 def main(argv: list[str] | None = None) -> int:
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+
+    if not raw_args or raw_args == ["--debug"]:
+        configure_logging(get_settings(), debug=bool(raw_args))
+        try:
+            return _open_tui()
+        except KeyboardInterrupt:
+            print("\nOperação cancelada pelo usuário.", file=sys.stderr)
+            return 130
+
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_args)
 
     configure_logging(get_settings(), debug=args.debug)
 

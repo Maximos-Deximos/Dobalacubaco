@@ -146,6 +146,10 @@ class WorkspaceModel(Base):
         back_populates="workspace",
         cascade="all, delete-orphan",
     )
+    proposals: Mapped[list[ProposalModel]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
 
 
 # Fonte pública ou arquivo local associado a um workspace.
@@ -256,3 +260,101 @@ class SourceChunkModel(Base):
     )
 
     source: Mapped[SourceModel] = relationship(back_populates="chunks")
+
+
+# Proposta de solução vinculada a um workspace.
+class ProposalModel(Base):
+    __tablename__ = "proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft", index=True
+    )
+    current_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    workspace: Mapped[WorkspaceModel] = relationship(back_populates="proposals")
+    sections: Mapped[list[ProposalSectionModel]] = relationship(
+        back_populates="proposal",
+        cascade="all, delete-orphan",
+        order_by="ProposalSectionModel.position",
+    )
+    revisions: Mapped[list[ProposalRevisionModel]] = relationship(
+        back_populates="proposal",
+        cascade="all, delete-orphan",
+        order_by="ProposalRevisionModel.id",
+    )
+
+
+# Seção editável de uma proposta.
+class ProposalSectionModel(Base):
+    __tablename__ = "proposal_sections"
+    __table_args__ = (
+        UniqueConstraint(
+            "proposal_id",
+            "key",
+            name="uq_proposal_sections_proposal_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    proposal_id: Mapped[int] = mapped_column(
+        ForeignKey("proposals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="empty", index=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    proposal: Mapped[ProposalModel] = relationship(back_populates="sections")
+
+
+# Histórico append-only das alterações de seções.
+class ProposalRevisionModel(Base):
+    __tablename__ = "proposal_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    proposal_id: Mapped[int] = mapped_column(
+        ForeignKey("proposals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("proposal_sections.id", ondelete="SET NULL"),
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(32), nullable=False, default="update")
+    content_before: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content_after: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    actor: Mapped[str] = mapped_column(String(32), nullable=False, default="cli")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+    proposal: Mapped[ProposalModel] = relationship(back_populates="revisions")

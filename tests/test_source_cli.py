@@ -47,4 +47,4 @@ def test_source_cli_missing_workspace(isolated_database, capsys) -> None:
             "99",
         ]
     ) == 1
-    assert "Workspace 99 não encontrado" in capsys.readouterr().err
+    assert "Área de trabalho 99 não encontrada" in capsys.readouterr().err

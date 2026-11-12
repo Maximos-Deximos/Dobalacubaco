@@ -41,4 +41,4 @@ def test_workspace_cli_rejects_duplicate(isolated_database, capsys) -> None:
 # Informa quando o workspace não existe.
 def test_workspace_cli_missing(isolated_database, capsys) -> None:
     assert main(["workspace", "show", "999"]) == 1
-    assert "não encontrado" in capsys.readouterr().err
+    assert "não encontrada" in capsys.readouterr().err

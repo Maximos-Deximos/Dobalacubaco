@@ -123,10 +123,10 @@ def test_chat_repl(isolated_database, monkeypatch, capsys) -> None:
 # Informa workspace inexistente.
 def test_chat_missing_workspace(isolated_database, capsys) -> None:
     assert main(["chat", "ask", "Pergunta", "--workspace", "99"]) == 1
-    assert "Workspace 99 não encontrado" in capsys.readouterr().err
+    assert "Área de trabalho 99 não encontrada" in capsys.readouterr().err
 
 
 # Informa falha de indexação em workspace inexistente.
 def test_source_index_missing_workspace(isolated_database, capsys) -> None:
     assert main(["source", "index", "--workspace", "99"]) == 1
-    assert "Workspace 99 não encontrado" in capsys.readouterr().err
+    assert "Área de trabalho 99 não encontrada" in capsys.readouterr().err

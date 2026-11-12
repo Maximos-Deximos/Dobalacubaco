@@ -33,6 +33,9 @@ def test_initial_migration_creates_tables(tmp_path, monkeypatch) -> None:
         "source_snapshots",
         "source_chunks",
         "source_chunks_fts",
+        "proposals",
+        "proposal_sections",
+        "proposal_revisions",
     } <= tables
 
     reset_engine()
