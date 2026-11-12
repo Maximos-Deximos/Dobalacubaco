@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 
+from app.application.indexing_service import IndexingError, IndexingService
 from app.application.source_service import (
     IngestionResult,
     SourceIngestionError,
@@ -57,6 +58,39 @@ def command_source_add_file(args: argparse.Namespace) -> int:
         return 1
 
     _print_ingestion_result(result)
+    return 0
+
+
+# Cria ou atualiza o índice de busca de um workspace.
+def command_source_index(args: argparse.Namespace) -> int:
+    init_db()
+    service = IndexingService()
+
+    try:
+        result = service.index_workspace(
+            args.workspace_id,
+            source_id=args.source_id,
+            force=args.force,
+        )
+    except (WorkspaceNotFoundError, SourceNotFoundError, IndexingError) as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json_output:
+        print(result.model_dump_json(indent=2))
+        return 0
+
+    print(
+        f"Indexação concluída: {result.sources_indexed} fonte(s), "
+        f"{result.chunks_created} trecho(s), "
+        f"{result.embeddings_created} embedding(s)."
+    )
+    if result.sources_skipped:
+        print(f"Fontes ignoradas: {result.sources_skipped}.")
+    if result.warnings:
+        print("Avisos:")
+        for warning in result.warnings:
+            print(f"  - {warning}")
     return 0
 
 

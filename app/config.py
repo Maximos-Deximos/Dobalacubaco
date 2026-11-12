@@ -33,6 +33,17 @@ def _env_int(values: Mapping[str, str], key: str, default: int) -> int:
         raise ValueError(f"{key} deve ser um número inteiro.") from exc
 
 
+# Converte variáveis de ambiente textuais em números decimais.
+def _env_float(values: Mapping[str, str], key: str, default: float) -> float:
+    raw = values.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{key} deve ser um número decimal.") from exc
+
+
 # Converte listas separadas por vírgula em tuplas normalizadas.
 def _env_list(values: Mapping[str, str], key: str) -> tuple[str, ...]:
     raw = values.get(key, "")
@@ -58,7 +69,15 @@ class Settings:
     database_url: str
     ollama_host: str
     ollama_model: str
+    ollama_embed_model: str
     ollama_timeout: int
+    rag_chunk_chars: int
+    rag_chunk_overlap: int
+    rag_top_k: int
+    rag_max_context_chars: int
+    rag_embed_batch: int
+    rag_history_turns: int
+    rag_temperature: float
     allowed_domains: tuple[str, ...]
     denied_domains: tuple[str, ...]
     allow_private_networks: bool
@@ -90,13 +109,50 @@ class Settings:
         if not database_url:
             database_url = f"sqlite:///{data_dir / 'agent.db'}"
 
+        rag_chunk_chars = _env_int(values, "RAG_CHUNK_CHARS", 1800)
+        rag_chunk_overlap = _env_int(values, "RAG_CHUNK_OVERLAP", 250)
+        rag_top_k = _env_int(values, "RAG_TOP_K", 6)
+        rag_max_context_chars = _env_int(values, "RAG_MAX_CONTEXT_CHARS", 12_000)
+        rag_embed_batch = _env_int(values, "RAG_EMBED_BATCH", 16)
+        rag_history_turns = _env_int(values, "RAG_HISTORY_TURNS", 6)
+        rag_temperature = _env_float(values, "RAG_TEMPERATURE", 0.1)
+
+        if rag_chunk_chars < 100:
+            raise ValueError("RAG_CHUNK_CHARS deve ser pelo menos 100.")
+        if rag_chunk_overlap < 0 or rag_chunk_overlap >= rag_chunk_chars:
+            raise ValueError(
+                "RAG_CHUNK_OVERLAP deve ser maior ou igual a zero e menor que "
+                "RAG_CHUNK_CHARS."
+            )
+        if rag_top_k < 1:
+            raise ValueError("RAG_TOP_K deve ser pelo menos 1.")
+        if rag_max_context_chars < 100:
+            raise ValueError("RAG_MAX_CONTEXT_CHARS deve ser pelo menos 100.")
+        if rag_embed_batch < 1:
+            raise ValueError("RAG_EMBED_BATCH deve ser pelo menos 1.")
+        if rag_history_turns < 0:
+            raise ValueError("RAG_HISTORY_TURNS não pode ser negativo.")
+        if not 0 <= rag_temperature <= 2:
+            raise ValueError("RAG_TEMPERATURE deve estar entre 0 e 2.")
+
         return cls(
             project_root=PROJECT_ROOT,
             data_dir=data_dir,
             database_url=database_url,
             ollama_host=values.get("OLLAMA_HOST", "http://127.0.0.1:11434").strip(),
             ollama_model=values.get("OLLAMA_MODEL", "qwen3.5:4b").strip(),
+            ollama_embed_model=values.get(
+                "OLLAMA_EMBED_MODEL",
+                "bge-m3",
+            ).strip(),
             ollama_timeout=_env_int(values, "OLLAMA_TIMEOUT", 120),
+            rag_chunk_chars=rag_chunk_chars,
+            rag_chunk_overlap=rag_chunk_overlap,
+            rag_top_k=rag_top_k,
+            rag_max_context_chars=rag_max_context_chars,
+            rag_embed_batch=rag_embed_batch,
+            rag_history_turns=rag_history_turns,
+            rag_temperature=rag_temperature,
             allowed_domains=_env_list(values, "ALLOWED_DOMAINS"),
             denied_domains=_env_list(values, "DENIED_DOMAINS"),
             allow_private_networks=_env_bool(values, "ALLOW_PRIVATE_NETWORKS", False),

@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -185,6 +186,10 @@ class SourceModel(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    chunks: Mapped[list[SourceChunkModel]] = relationship(
+        back_populates="source",
+        cascade="all, delete-orphan",
+    )
 
 
 # Conteúdo bruto e texto extraído de uma fonte.
@@ -212,3 +217,42 @@ class SourceSnapshotModel(Base):
     )
 
     source: Mapped[SourceModel] = relationship(back_populates="snapshot")
+
+
+# Trecho indexado de uma fonte para busca semântica e lexical.
+class SourceChunkModel(Base):
+    __tablename__ = "source_chunks"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_id",
+            "chunk_index",
+            name="uq_source_chunks_source_chunk",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    char_start: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    char_end: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    section_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    embedding: Mapped[list[float] | None] = mapped_column(JSON)
+    embedding_model: Mapped[str | None] = mapped_column(String(120))
+    embedding_dim: Mapped[int | None] = mapped_column(Integer)
+    indexed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+    source: Mapped[SourceModel] = relationship(back_populates="chunks")

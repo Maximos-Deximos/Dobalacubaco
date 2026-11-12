@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import os
 import sys
-import urllib.request
 from pathlib import Path
 
+from app.ai.ollama_client import OllamaClient, OllamaError
 from app.config import get_settings
 from app.logging_config import configure_logging
 from app.memory.database import init_db
 from app.ui.browser_cli import command_inspect
+from app.ui.chat_cli import (
+    command_chat_ask,
+    command_chat_repl,
+    command_chat_status,
+)
 from app.ui.cli import (
     command_profile_init,
     command_profile_set,
@@ -22,6 +26,7 @@ from app.ui.cli import (
 from app.ui.source_cli import (
     command_source_add,
     command_source_add_file,
+    command_source_index,
     command_source_list,
     command_source_show,
 )
@@ -32,24 +37,46 @@ from app.ui.workspace_cli import (
 )
 
 
-# Verifica se o serviço Ollama responde e se o modelo está instalado.
-def _check_ollama(host: str, model: str) -> tuple[bool, str]:
-    url = host.rstrip("/") + "/api/tags"
+# Compara nomes de modelos tratando a tag implícita ":latest" como equivalente.
+def _model_installed(model: str, installed: set[str]) -> bool:
+    normalized = model.removesuffix(":latest")
+    return any(name.removesuffix(":latest") == normalized for name in installed)
+
+
+# Verifica se os modelos de chat e embedding estão instalados.
+def _check_ollama(
+    host: str,
+    timeout: int,
+    model: str,
+    embed_model: str,
+) -> tuple[bool, str, bool, str]:
     try:
-        with urllib.request.urlopen(url, timeout=3) as response:
-            payload = json.load(response)
-    except Exception as exc:  # noqa: BLE001
-        return False, f"não foi possível conectar em {host}: {exc}"
+        names = set(
+            OllamaClient(host=host, timeout=timeout).list_models()
+        )
+    except OllamaError as exc:
+        detail = f"não foi possível consultar o Ollama em {host}: {exc}"
+        return False, detail, False, detail
 
-    names = {
-        item.get("name", "")
-        for item in payload.get("models", [])
-        if isinstance(item, dict)
-    }
-    if not any(name == model for name in names):
-        return False, f"modelo '{model}' ausente; execute: ollama pull {model}"
+    chat_ok = _model_installed(model, names)
+    chat_detail = (
+        f"modelo '{model}' disponível"
+        if chat_ok
+        else f"modelo '{model}' ausente; execute: ollama pull {model}"
+    )
 
-    return True, f"modelo '{model}' disponível"
+    if not embed_model:
+        embed_ok = True
+        embed_detail = "modelo de embedding não configurado; busca lexical ativa"
+    else:
+        embed_ok = _model_installed(embed_model, names)
+        embed_detail = (
+            f"modelo '{embed_model}' disponível"
+            if embed_ok
+            else f"modelo '{embed_model}' ausente; execute: ollama pull {embed_model}"
+        )
+
+    return chat_ok, chat_detail, embed_ok, embed_detail
 
 
 # Verifica se o pacote e os navegadores do Playwright estão instalados.
@@ -88,8 +115,14 @@ def command_doctor(_args: argparse.Namespace) -> int:
     data_dir_ok = settings.data_dir.exists() and os.access(settings.data_dir, os.W_OK)
     add_check("diretório de dados", data_dir_ok, str(settings.data_dir))
 
-    ollama_ok, ollama_detail = _check_ollama(settings.ollama_host, settings.ollama_model)
+    ollama_ok, ollama_detail, embed_ok, embed_detail = _check_ollama(
+        settings.ollama_host,
+        settings.ollama_timeout,
+        settings.ollama_model,
+        settings.ollama_embed_model,
+    )
     add_check("ollama", ollama_ok, ollama_detail)
+    add_check("embedding", embed_ok, embed_detail)
 
     playwright_ok, playwright_detail = _check_playwright()
     add_check("playwright", playwright_ok, playwright_detail)
@@ -277,6 +310,37 @@ def _add_source_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     source_add_file.set_defaults(func=command_source_add_file)
 
+    source_index = source_subparsers.add_parser(
+        "index",
+        help="cria ou atualiza o índice de busca",
+    )
+    source_index.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    source_index.add_argument(
+        "--source",
+        type=int,
+        default=None,
+        dest="source_id",
+        help="indexa apenas uma fonte",
+    )
+    source_index.add_argument(
+        "--force",
+        action="store_true",
+        help="recria os trechos mesmo que já estejam indexados",
+    )
+    source_index.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    source_index.set_defaults(func=command_source_index)
+
     source_list = source_subparsers.add_parser(
         "list",
         help="lista as fontes de um workspace",
@@ -310,6 +374,84 @@ def _add_source_parser(subparsers: argparse._SubParsersAction) -> None:
     source_show.set_defaults(func=command_source_show)
 
 
+# Registra os subcomandos de chat.
+def _add_chat_parser(subparsers: argparse._SubParsersAction) -> None:
+    chat = subparsers.add_parser(
+        "chat",
+        help="conversa com as fontes indexadas",
+    )
+    chat_subparsers = chat.add_subparsers(
+        dest="chat_command",
+        required=True,
+    )
+
+    chat_ask = chat_subparsers.add_parser(
+        "ask",
+        help="faz uma pergunta única ao workspace",
+    )
+    chat_ask.add_argument("question", help="pergunta em linguagem natural")
+    chat_ask.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    chat_ask.add_argument(
+        "--top-k",
+        type=int,
+        default=None,
+        dest="top_k",
+        help="quantidade de trechos recuperados",
+    )
+    chat_ask.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe a resposta em JSON",
+    )
+    chat_ask.set_defaults(func=command_chat_ask)
+
+    chat_repl = chat_subparsers.add_parser(
+        "repl",
+        help="inicia uma conversa interativa",
+    )
+    chat_repl.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    chat_repl.add_argument(
+        "--top-k",
+        type=int,
+        default=None,
+        dest="top_k",
+        help="quantidade de trechos recuperados",
+    )
+    chat_repl.set_defaults(func=command_chat_repl)
+
+    chat_status = chat_subparsers.add_parser(
+        "status",
+        help="exibe a situação do índice",
+    )
+    chat_status.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    chat_status.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    chat_status.set_defaults(func=command_chat_status)
+
+
 # Monta o parser principal da CLI.
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -334,6 +476,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_inspect_parser(subparsers)
     _add_workspace_parser(subparsers)
     _add_source_parser(subparsers)
+    _add_chat_parser(subparsers)
 
     return parser
 
