@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from playwright.async_api import Frame, Page
+from playwright.async_api import Page
 
 from app.browser.adapters.google_forms import GoogleFormsAdapter
 from app.browser.page_inspector import PageInspector
 from app.config import Settings, get_settings
 from app.schemas.form import (
-    DetectionResult,
     DetectedField,
     DetectedSubField,
+    DetectionResult,
     FieldOption,
     FieldType,
     PageSnapshot,
 )
-
 
 # Extrai controles do DOM, agrupa opções e injeta atributos estáveis.
 EXTRACTION_SCRIPT = r"""
@@ -689,7 +688,7 @@ class FormDetector:
                     )
                     frame_metadata = {}
                     adapter_name = "generic"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 _append_warning(
                     warnings,
                     f"Falha ao inspecionar o frame {frame_url or '(sem URL)'}: {exc}",

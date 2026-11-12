@@ -24,7 +24,7 @@ def command_inspect(args: argparse.Namespace) -> int:
     except (InvalidUrlError, NavigationError, BrowserLaunchError) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"Erro inesperado: {exc}", file=sys.stderr)
         return 1
 

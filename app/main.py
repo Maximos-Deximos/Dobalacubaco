@@ -19,6 +19,17 @@ from app.ui.cli import (
     command_profile_set,
     command_profile_show,
 )
+from app.ui.source_cli import (
+    command_source_add,
+    command_source_add_file,
+    command_source_list,
+    command_source_show,
+)
+from app.ui.workspace_cli import (
+    command_workspace_list,
+    command_workspace_new,
+    command_workspace_show,
+)
 
 
 # Verifica se o serviço Ollama responde e se o modelo está instalado.
@@ -27,7 +38,7 @@ def _check_ollama(host: str, model: str) -> tuple[bool, str]:
     try:
         with urllib.request.urlopen(url, timeout=3) as response:
             payload = json.load(response)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, f"não foi possível conectar em {host}: {exc}"
 
     names = {
@@ -71,7 +82,7 @@ def command_doctor(_args: argparse.Namespace) -> int:
     try:
         init_db()
         add_check("banco de dados", True, settings.database_url)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         add_check("banco de dados", False, str(exc))
 
     data_dir_ok = settings.data_dir.exists() and os.access(settings.data_dir, os.W_OK)
@@ -160,6 +171,145 @@ def _add_inspect_parser(subparsers: argparse._SubParsersAction) -> None:
     inspect_parser.set_defaults(func=command_inspect)
 
 
+# Registra os subcomandos de workspace.
+def _add_workspace_parser(subparsers: argparse._SubParsersAction) -> None:
+    workspace = subparsers.add_parser(
+        "workspace",
+        help="gerencia workspaces de editais",
+    )
+    workspace_subparsers = workspace.add_subparsers(
+        dest="workspace_command",
+        required=True,
+    )
+
+    workspace_new = workspace_subparsers.add_parser(
+        "new",
+        help="cria um workspace",
+    )
+    workspace_new.add_argument("name", help="nome do workspace")
+    workspace_new.add_argument(
+        "--description",
+        default="",
+        help="descrição do workspace",
+    )
+    workspace_new.set_defaults(func=command_workspace_new)
+
+    workspace_list = workspace_subparsers.add_parser(
+        "list",
+        help="lista os workspaces",
+    )
+    workspace_list.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    workspace_list.set_defaults(func=command_workspace_list)
+
+    workspace_show = workspace_subparsers.add_parser(
+        "show",
+        help="exibe um workspace",
+    )
+    workspace_show.add_argument("workspace_id", type=int, help="ID do workspace")
+    workspace_show.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    workspace_show.set_defaults(func=command_workspace_show)
+
+
+# Registra os subcomandos de fontes.
+def _add_source_parser(subparsers: argparse._SubParsersAction) -> None:
+    source = subparsers.add_parser(
+        "source",
+        help="adiciona e consulta fontes de editais",
+    )
+    source_subparsers = source.add_subparsers(
+        dest="source_command",
+        required=True,
+    )
+
+    source_add = source_subparsers.add_parser(
+        "add",
+        help="baixa e ingere uma URL pública",
+    )
+    source_add.add_argument("url", help="URL pública do edital ou documento")
+    source_add.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    source_add.add_argument(
+        "--browser",
+        action="store_true",
+        dest="use_browser",
+        help="força o uso do Playwright para renderizar a página",
+    )
+    source_add.add_argument(
+        "--follow-pdfs",
+        action="store_true",
+        dest="follow_pdfs",
+        help="ingere também PDFs vinculados na página",
+    )
+    source_add.add_argument(
+        "--max-links",
+        type=int,
+        default=None,
+        help="limite de PDFs vinculados a ingerir",
+    )
+    source_add.set_defaults(func=command_source_add)
+
+    source_add_file = source_subparsers.add_parser(
+        "add-file",
+        help="ingere um arquivo HTML ou PDF local",
+    )
+    source_add_file.add_argument("path", help="caminho do arquivo")
+    source_add_file.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    source_add_file.set_defaults(func=command_source_add_file)
+
+    source_list = source_subparsers.add_parser(
+        "list",
+        help="lista as fontes de um workspace",
+    )
+    source_list.add_argument(
+        "--workspace",
+        type=int,
+        required=True,
+        dest="workspace_id",
+        help="ID do workspace",
+    )
+    source_list.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    source_list.set_defaults(func=command_source_list)
+
+    source_show = source_subparsers.add_parser(
+        "show",
+        help="exibe uma fonte e seu snapshot",
+    )
+    source_show.add_argument("source_id", type=int, help="ID da fonte")
+    source_show.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    source_show.set_defaults(func=command_source_show)
+
+
 # Monta o parser principal da CLI.
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -182,6 +332,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     _add_profile_parser(subparsers)
     _add_inspect_parser(subparsers)
+    _add_workspace_parser(subparsers)
+    _add_source_parser(subparsers)
 
     return parser
 

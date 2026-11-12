@@ -7,3 +7,17 @@ fastapi
 uvicorn[standard]
 pytest
 pytest-asyncio
+httpx
+beautifulsoup4
+lxml
+trafilatura
+pypdf
+python-docx
+jinja2
+python-multipart
+alembic
+sse-starlette
+numpy
+tiktoken
+ruff
+respx

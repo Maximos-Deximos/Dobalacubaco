@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from playwright.async_api import Frame
-
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 # Extrai perguntas, opções e metadados usando a estrutura semântica do Google Forms.
 GOOGLE_FORMS_SCRIPT = r"""
@@ -708,7 +708,7 @@ class GoogleFormsAdapter:
                 state="attached",
                 timeout=5_000,
             )
-        except Exception:
+        except PlaywrightTimeoutError:
             pass
 
         payload = await frame.evaluate(
@@ -717,10 +717,12 @@ class GoogleFormsAdapter:
         )
 
         if not isinstance(payload, dict):
-            raise RuntimeError("O adaptador do Google Forms retornou um formato inválido.")
+            raise TypeError("O adaptador do Google Forms retornou um formato inválido.")
 
         if not isinstance(payload.get("fields"), list):
-            raise RuntimeError("O adaptador do Google Forms não retornou uma lista de campos.")
+            raise TypeError(
+                "O adaptador do Google Forms não retornou uma lista de campos."
+            )
 
         if not isinstance(payload.get("metadata"), dict):
             payload["metadata"] = {}

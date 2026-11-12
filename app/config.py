@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Mapping
 
 from dotenv import load_dotenv
 
@@ -62,16 +62,23 @@ class Settings:
     allowed_domains: tuple[str, ...]
     denied_domains: tuple[str, ...]
     allow_private_networks: bool
+    allow_http: bool
     headless: bool
     max_actions: int
     execution_timeout: int
+    max_source_bytes: int
+    max_pdf_bytes: int
+    fetch_timeout: int
+    max_redirects: int
+    max_linked_pdfs: int
+    fetch_user_agent: str
     sensitive_field_action: str
     log_level: str
     log_file: Path | None
 
     # Monta a configuração a partir do ambiente informado.
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
+    def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         values = os.environ if env is None else env
 
         sensitive_action = values.get("SENSITIVE_FIELD_ACTION", "confirm").strip().lower()
@@ -93,9 +100,19 @@ class Settings:
             allowed_domains=_env_list(values, "ALLOWED_DOMAINS"),
             denied_domains=_env_list(values, "DENIED_DOMAINS"),
             allow_private_networks=_env_bool(values, "ALLOW_PRIVATE_NETWORKS", False),
+            allow_http=_env_bool(values, "ALLOW_HTTP", False),
             headless=_env_bool(values, "HEADLESS", False),
             max_actions=_env_int(values, "MAX_ACTIONS", 200),
             execution_timeout=_env_int(values, "EXECUTION_TIMEOUT", 180),
+            max_source_bytes=_env_int(values, "MAX_SOURCE_BYTES", 20_971_520),
+            max_pdf_bytes=_env_int(values, "MAX_PDF_BYTES", 52_428_800),
+            fetch_timeout=_env_int(values, "FETCH_TIMEOUT", 30),
+            max_redirects=_env_int(values, "MAX_REDIRECTS", 5),
+            max_linked_pdfs=_env_int(values, "MAX_LINKED_PDFS", 10),
+            fetch_user_agent=values.get(
+                "FETCH_USER_AGENT",
+                "agente-editais-ia/0.1",
+            ).strip(),
             sensitive_field_action=sensitive_action,
             log_level=values.get("LOG_LEVEL", "INFO").strip().upper(),
             log_file=_env_path(values, "LOG_FILE", PROJECT_ROOT),

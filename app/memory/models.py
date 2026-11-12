@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.schemas.execution import ExecutionStatus
@@ -13,7 +23,7 @@ from app.schemas.form import FieldStatus, FieldType
 
 # Devolve a data e hora atual em UTC.
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # Classe base declarativa do SQLAlchemy.
@@ -76,7 +86,7 @@ class ExecutionModel(Base):
         DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
     )
 
-    fields: Mapped[list["ExecutionFieldModel"]] = relationship(
+    fields: Mapped[list[ExecutionFieldModel]] = relationship(
         back_populates="execution",
         cascade="all, delete-orphan",
     )
@@ -112,3 +122,93 @@ class ExecutionFieldModel(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
     execution: Mapped[ExecutionModel] = relationship(back_populates="fields")
+
+
+# Workspace que agrupa fontes e, futuramente, a proposta de um edital.
+class WorkspaceModel(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="active", index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    sources: Mapped[list[SourceModel]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+
+
+# Fonte pública ou arquivo local associado a um workspace.
+class SourceModel(Base):
+    __tablename__ = "sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    parent_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sources.id", ondelete="SET NULL"),
+        index=True,
+    )
+    url: Mapped[str | None] = mapped_column(Text)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    final_url: Mapped[str | None] = mapped_column(Text)
+    content_type: Mapped[str | None] = mapped_column(String(120))
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="pending", index=True
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    workspace: Mapped[WorkspaceModel] = relationship(back_populates="sources")
+    snapshot: Mapped[SourceSnapshotModel | None] = relationship(
+        back_populates="source",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+# Conteúdo bruto e texto extraído de uma fonte.
+class SourceSnapshotModel(Base):
+    __tablename__ = "source_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    raw_path: Mapped[str] = mapped_column(Text, nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    segments: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    extra_metadata: Mapped[dict] = mapped_column(
+        "metadata", JSON, nullable=False, default=dict
+    )
+    warnings: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+    source: Mapped[SourceModel] = relationship(back_populates="snapshot")

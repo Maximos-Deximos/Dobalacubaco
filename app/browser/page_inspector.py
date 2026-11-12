@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from app.config import Settings, get_settings
 from app.schemas.form import PageSnapshot

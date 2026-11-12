@@ -33,6 +33,7 @@ async def _serve_html(route, path: Path) -> None:
 def isolated_database(tmp_path, monkeypatch):
     database_url = f"sqlite:///{tmp_path / 'test.db'}"
     monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     get_settings.cache_clear()
     reset_engine()
 

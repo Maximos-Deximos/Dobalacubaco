@@ -117,7 +117,7 @@ class DetectionResult(BaseModel):
 
     # Impede que o mesmo campo seja detectado duas vezes.
     @model_validator(mode="after")
-    def validate_unique_field_ids(self) -> "DetectionResult":
+    def validate_unique_field_ids(self) -> DetectionResult:
         ids = [field.field_id for field in self.fields]
         if len(ids) != len(set(ids)):
             raise ValueError("A detecção contém field_id duplicado.")
@@ -147,7 +147,7 @@ class FillPlan(BaseModel):
 
     # Impede que o mesmo campo seja preenchido duas vezes.
     @model_validator(mode="after")
-    def validate_unique_field_ids(self) -> "FillPlan":
+    def validate_unique_field_ids(self) -> FillPlan:
         ids = [field.field_id for field in self.fields]
         if len(ids) != len(set(ids)):
             raise ValueError("O plano contém field_id duplicado.")

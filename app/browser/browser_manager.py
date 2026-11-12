@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Self
 
 from playwright.async_api import (
     Browser,
@@ -114,7 +115,7 @@ class BrowserManager:
                 logger.debug("Falha ao encerrar o Playwright.", exc_info=True)
         self._playwright = None
 
-    async def __aenter__(self) -> "BrowserManager":
+    async def __aenter__(self) -> Self:
         await self.start()
         return self
 
