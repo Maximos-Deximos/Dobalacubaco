@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
@@ -76,10 +76,12 @@ def get_session_factory(database_url: str | None = None) -> sessionmaker:
 
 # Cria todas as tabelas registradas nos modelos ORM.
 def init_db(database_url: str | None = None) -> Engine:
+    from app.memory.fts import ensure_chunk_fts
     from app.memory.models import Base
 
     engine = get_engine(database_url)
     Base.metadata.create_all(bind=engine)
+    ensure_chunk_fts(engine)
     return engine
 
 

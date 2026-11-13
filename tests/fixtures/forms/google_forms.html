@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Edital de Inovação - Google Forms</title>
+</head>
+<body>
+  <div role="heading" aria-level="1">Edital de Inovação 2026</div>
+  <div>Formulário de inscrição para equipes de inovação.</div>
+
+  <div role="heading" aria-level="2">Dados do proponente</div>
+
+  <div role="listitem">
+    <div class="freebirdFormviewerComponentsQuestionBaseHeader">
+      <div role="heading" aria-level="3" id="q1">Nome completo *</div>
+    </div>
+    <div aria-describedby="help1">
+      <input type="text" aria-labelledby="q1" aria-describedby="help1" required>
+    </div>
+    <div id="help1">Informe o nome como consta no documento oficial.</div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q2">Resumo do projeto *</div>
+    <textarea aria-label="Sua resposta" aria-labelledby="q2" required></textarea>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q3">A equipe já participou de outra edição? *</div>
+    <div role="radiogroup" aria-labelledby="q3" data-required="true">
+      <input type="hidden" name="entry.100_sentinel">
+      <div role="radio" aria-label="Sim" data-value="sim" aria-checked="false"></div>
+      <div role="radio" aria-label="Não" data-value="nao" aria-checked="false"></div>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q4">Tecnologias utilizadas *</div>
+    <div role="group" aria-labelledby="q4" data-required="true">
+      <div role="checkbox" aria-label="Python" data-value="python" aria-checked="false"></div>
+      <div role="checkbox" aria-label="Arduino" data-value="arduino" aria-checked="false"></div>
+      <div role="checkbox" aria-label="Raspberry Pi" data-value="raspberry" aria-checked="false"></div>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q5">Categoria do edital *</div>
+    <div role="listbox" aria-labelledby="q5" data-required="true">
+      <div role="option" aria-label="Solução digital" data-value="digital"></div>
+      <div role="option" aria-label="Robótica" data-value="robotica"></div>
+      <div role="option" aria-label="Saúde" data-value="saude"></div>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q6">Nível de maturidade</div>
+    <div role="radiogroup" aria-labelledby="q6" data-required="false">
+      <div role="radio" aria-label="1" data-value="1"></div>
+      <div role="radio" aria-label="2" data-value="2"></div>
+      <div role="radio" aria-label="3" data-value="3"></div>
+      <div role="radio" aria-label="4" data-value="4"></div>
+      <div role="radio" aria-label="5" data-value="5"></div>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q7">Data de submissão *</div>
+    <div data-required="true">
+      <input type="text" aria-label="DD" aria-labelledby="q7" required>
+      <input type="text" aria-label="MM" aria-labelledby="q7" required>
+      <input type="text" aria-label="YYYY" aria-labelledby="q7" required>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q8">Horário preferencial *</div>
+    <div data-required="true">
+      <input type="text" aria-label="HH" aria-labelledby="q8" required>
+      <input type="text" aria-label="MM" aria-labelledby="q8" required>
+    </div>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q9">Anexo do projeto</div>
+    <input type="file" aria-label="Anexo do projeto" aria-labelledby="q9">
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q10">Avaliação por critério *</div>
+    <table role="grid" aria-labelledby="q10" data-required="true">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Atende</th>
+          <th>Não atende</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr role="row">
+          <th>Clareza</th>
+          <td><div role="radio" aria-label="Atende" data-value="sim"></div></td>
+          <td><div role="radio" aria-label="Não atende" data-value="nao"></div></td>
+        </tr>
+        <tr role="row">
+          <th>Viabilidade</th>
+          <td><div role="radio" aria-label="Atende" data-value="sim"></div></td>
+          <td><div role="radio" aria-label="Não atende" data-value="nao"></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div role="listitem">
+    <div role="heading" aria-level="3" id="q11">Concordo com os termos *</div>
+    <div role="group" aria-labelledby="q11" data-required="true">
+      <div role="checkbox" aria-label="Concordo com os termos e a política de privacidade" data-value="sim"></div>
+    </div>
+  </div>
+
+  <div role="button" tabindex="0">Próxima</div>
+</body>
+</html>

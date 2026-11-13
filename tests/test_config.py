@@ -10,6 +10,11 @@ def test_default_settings() -> None:
     settings = Settings.from_env(env={})
 
     assert settings.ollama_model == "qwen3.5:4b"
+    assert settings.ollama_embed_model == "bge-m3"
+    assert settings.rag_chunk_chars == 1800
+    assert settings.rag_chunk_overlap == 250
+    assert settings.rag_top_k == 6
+    assert settings.rag_embed_batch == 16
     assert settings.database_url.startswith("sqlite:///")
     assert settings.headless is False
     assert settings.sensitive_field_action == "confirm"
@@ -38,3 +43,15 @@ def test_lists_and_booleans() -> None:
 def test_invalid_sensitive_action() -> None:
     with pytest.raises(ValueError):
         Settings.from_env(env={"SENSITIVE_FIELD_ACTION": "enviar"})
+
+
+# Rejeita sobreposição maior ou igual ao tamanho do trecho.
+def test_invalid_rag_overlap() -> None:
+    with pytest.raises(ValueError):
+        Settings.from_env(env={"RAG_CHUNK_CHARS": "500", "RAG_CHUNK_OVERLAP": "500"})
+
+
+# Rejeita temperatura fora da faixa aceita.
+def test_invalid_rag_temperature() -> None:
+    with pytest.raises(ValueError):
+        Settings.from_env(env={"RAG_TEMPERATURE": "3"})

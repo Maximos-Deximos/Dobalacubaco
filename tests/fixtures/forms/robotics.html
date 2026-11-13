@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Inscrição Competição de Robótica</title>
+</head>
+<body>
+  <h1>Competição de Robótica</h1>
+
+  <form action="/submit" method="post">
+    <input type="hidden" name="form_id" value="robotics">
+
+    <p>
+      <label for="team_name">Nome da equipe</label>
+      <input id="team_name" name="team_name" type="text" required>
+    </p>
+
+    <p>
+      <label for="team_size">Número de integrantes</label>
+      <input id="team_size" name="team_size" type="number" min="1">
+    </p>
+
+    <p>
+      <label for="category">Categoria</label>
+      <select id="category" name="category" required>
+        <option value="">Selecione</option>
+        <option value="line">Seguidor de linha</option>
+        <option value="sumo">Sumô</option>
+        <option value="rescue">Resgate</option>
+      </select>
+    </p>
+
+    <fieldset>
+      <legend>Modo autônomo</legend>
+      <label><input type="radio" name="autonomous" value="yes" required> Sim</label>
+      <label><input type="radio" name="autonomous" value="no"> Não</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Componentes</legend>
+      <label><input type="checkbox" name="components" value="arduino"> Arduino</label>
+      <label><input type="checkbox" name="components" value="raspberry"> Raspberry Pi</label>
+      <label><input type="checkbox" name="components" value="sensors"> Sensores</label>
+    </fieldset>
+
+    <p>
+      <label for="description">Descrição do robô</label>
+      <textarea id="description" name="description" required></textarea>
+    </p>
+
+    <p>
+      <label><input type="checkbox" name="safety_consent" required> Concordo com as regras de segurança</label>
+    </p>
+
+    <p>
+      <label for="mentor_email">E-mail do mentor</label>
+      <input id="mentor_email" name="mentor_email" type="email" required>
+    </p>
+
+    <button type="submit">Enviar</button>
+  </form>
+</body>
+</html>

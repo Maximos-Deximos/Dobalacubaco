@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 from logging.handlers import RotatingFileHandler
 
 from app.config import Settings
@@ -25,6 +26,17 @@ class RedactionFilter(logging.Filter):
         return True
 
 
+# Usa o stderr atual em cada emissão para sobreviver a redirecionamentos.
+class DynamicStreamHandler(logging.StreamHandler):
+    @property
+    def stream(self):
+        return sys.stderr
+
+    @stream.setter
+    def stream(self, _value) -> None:
+        pass
+
+
 # Configura o logger raiz uma única vez.
 def configure_logging(settings: Settings, debug: bool = False) -> None:
     global _configured
@@ -42,7 +54,7 @@ def configure_logging(settings: Settings, debug: bool = False) -> None:
         "%Y-%m-%d %H:%M:%S",
     )
 
-    console_handler = logging.StreamHandler()
+    console_handler = DynamicStreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.addFilter(RedactionFilter())
     root.addHandler(console_handler)

@@ -12,3 +12,6 @@ data/*.db-*
 
 # Cache de testes
 .pytest_cache/
+
+# Dados individuais
+data/

@@ -12,7 +12,6 @@ from app.memory.user_repository import (
 )
 from app.schemas.profile import PROFILE_KEYS, ProfilePatch, UserProfile
 
-
 # Campos fixos que podem ser alterados diretamente pela CLI.
 DIRECT_PROFILE_FIELDS = set(PROFILE_KEYS) - {"links", "skills"}
 
