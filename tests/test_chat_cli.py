@@ -80,6 +80,45 @@ def test_chat_ask_json(isolated_database, monkeypatch, capsys) -> None:
     assert answer["model"] == "qwen3.5:4b"
 
 
+# Responde mesmo sem fontes indexadas, sem citações.
+@respx.mock
+def test_chat_ask_without_sources(isolated_database, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("OLLAMA_HOST", OLLAMA)
+    get_settings.cache_clear()
+    respx.post(f"{OLLAMA}/api/chat").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": "Posso sugerir uma estrutura geral.",
+                }
+            },
+        )
+    )
+
+    assert main(["workspace", "new", "Chat vazio"]) == 0
+    capsys.readouterr()
+
+    assert main(
+        [
+            "chat",
+            "ask",
+            "Como estruturar a proposta?",
+            "--workspace",
+            "1",
+            "--json",
+        ]
+    ) == 0
+
+    answer = json.loads(capsys.readouterr().out)
+    assert answer["answer"] == "Posso sugerir uma estrutura geral."
+    assert answer["mode"] is None
+    assert answer["retrieved_count"] == 0
+    assert answer["citations"] == []
+    assert any("Nenhuma fonte indexada" in item for item in answer["warnings"])
+
+
 # Exibe a situação do índice em JSON.
 @respx.mock
 def test_chat_status_json(isolated_database, monkeypatch, capsys) -> None:

@@ -3,6 +3,7 @@
 from app.tui.screens.chat import ChatPane
 from app.tui.screens.help import HelpScreen
 from app.tui.screens.home import HomeScreen
+from app.tui.screens.pdf_form import PdfFormScreen
 from app.tui.screens.profile import ProfileEditScreen, ProfileScreen
 from app.tui.screens.proposals import ProposalScreen, ProposalsPane, ProposalsScreen
 from app.tui.screens.sources import SourceDetailScreen, SourcesPane
@@ -15,6 +16,7 @@ __all__ = [
     "HelpScreen",
     "HomeScreen",
     "InspectPane",
+    "PdfFormScreen",
     "ProfileEditScreen",
     "ProfileScreen",
     "ProposalScreen",

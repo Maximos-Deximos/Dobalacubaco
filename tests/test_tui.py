@@ -8,6 +8,7 @@ from textual.widgets import DataTable, Input, TabbedContent
 from app.application.diagnostics_service import DiagnosticCheck
 from app.application.proposal_service import ProposalService
 from app.application.workspace_service import WorkspaceService
+from app.memory.chat_repository import ChatRepository
 from app.memory.database import init_db
 from app.schemas.form import DetectionResult, PageSnapshot
 from app.schemas.rag import ChatAnswer
@@ -19,8 +20,9 @@ from app.tui.screens.profile import ProfileEditScreen, ProfileScreen
 from app.tui.screens.proposals import ProposalScreen, ProposalsScreen
 from app.tui.screens.sources import SourcesPane
 from app.tui.screens.tools import ToolsScreen
-from app.tui.screens.workspaces import WorkspaceScreen
+from app.tui.screens.workspaces import WorkspaceScreen, WorkspacesScreen
 from app.tui.services import build_services
+from app.tui.widgets.modals import ConfirmModal
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ingestion"
 
@@ -56,6 +58,69 @@ async def test_tui_home_lists_workspaces(isolated_database: str) -> None:
         stats = app.screen.query_one("#home-stats")
         assert "Áreas de trabalho: 1" in str(stats.content)
         assert "Propostas: 1" in str(stats.content)
+
+
+# Expõe apenas comandos de sistema em português, sem tema ou captura de tela.
+@pytest.mark.asyncio
+async def test_tui_system_commands_are_localized(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        titles = {command.title for command in app.get_system_commands(app.screen)}
+
+    assert "Sair" in titles
+    assert "Theme" not in titles
+    assert "Maximize" not in titles
+    assert "Minimize" not in titles
+    assert "Screenshot" not in titles
+
+
+# Exclui uma área de trabalho pela lista, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_workspace(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("w")
+        await pilot.pause()
+        assert isinstance(app.screen, WorkspacesScreen)
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        table = app.screen.query_one("#workspaces-table", DataTable)
+        assert table.row_count == 0
+        assert app.services.workspaces.list_all() == []
+
+
+# Exclui uma proposta pela lista global, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_proposal(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("p")
+        await pilot.pause()
+        assert isinstance(app.screen, ProposalsScreen)
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        table = app.screen.query_one("#proposals-table", DataTable)
+        assert table.row_count == 0
+        assert app.services.proposals.list_all() == []
 
 
 # Abre e fecha a tela de ajuda pelo atalho.
@@ -225,6 +290,37 @@ async def test_tui_adds_local_source(isolated_database: str) -> None:
         assert table.get_row_at(0)[3] == "Pronta"
 
 
+# Exclui uma fonte pela aba de fontes, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_source(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-sources"
+        await pilot.pause()
+
+        sources = app.screen.query_one(SourcesPane)
+        await sources._after_add_file(str(FIXTURES / "sample_edital.pdf"))
+        await pilot.pause()
+
+        table = sources.query_one("#sources-table", DataTable)
+        assert table.row_count == 1
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        assert table.row_count == 0
+        assert app.services.sources.list_sources(workspace_id) == []
+
+
 # Envia uma pergunta usando um agente simulado.
 @pytest.mark.asyncio
 async def test_tui_chat_sends_question(
@@ -264,6 +360,67 @@ async def test_tui_chat_sends_question(
         assert len(chat.history) == 2
         assert chat.history[0].content == "Qual é o prazo?"
         assert chat.history[1].content == "Resposta simulada"
+
+
+# Restaura a conversa salva ao abrir a aba de chat.
+@pytest.mark.asyncio
+async def test_tui_restores_saved_conversation(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    answer = ChatAnswer(answer="Resposta antiga", model="modelo-teste")
+    ChatRepository().append_exchange(
+        workspace_id,
+        question="Pergunta antiga",
+        answer=answer.answer,
+        answer_metadata={"answer": answer.model_dump(mode="json")},
+    )
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-chat"
+        await pilot.pause()
+
+        chat = app.screen.query_one(ChatPane)
+        assert [message.content for message in chat.history] == [
+            "Pergunta antiga",
+            "Resposta antiga",
+        ]
+        assert len(app.services.chat.conversation(workspace_id)) == 2
+
+
+# Limpa a conversa salva após confirmação.
+@pytest.mark.asyncio
+async def test_tui_clears_saved_conversation(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    answer = ChatAnswer(answer="Resposta antiga", model="modelo-teste")
+    ChatRepository().append_exchange(
+        workspace_id,
+        question="Pergunta antiga",
+        answer=answer.answer,
+        answer_metadata={"answer": answer.model_dump(mode="json")},
+    )
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-chat"
+        await pilot.pause()
+
+        chat = app.screen.query_one(ChatPane)
+        await pilot.click("#chat-clear", offset=(1, 1))
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        assert chat.history == []
+        assert app.services.chat.conversation(workspace_id) == []
 
 
 # Executa o diagnóstico com verificações simuladas.

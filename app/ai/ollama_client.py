@@ -6,31 +6,40 @@ from typing import Any
 
 import httpx
 
+from app.ai.provider import (
+    AiError,
+    AiModelError,
+    AiResponseError,
+    AiUnavailableError,
+    normalize_messages,
+)
 from app.schemas.rag import ChatMessage
 
 
 # Erro base de comunicação com o Ollama.
-class OllamaError(RuntimeError):
+class OllamaError(AiError):
     pass
 
 
 # Erro de conexão, timeout ou indisponibilidade do serviço.
-class OllamaUnavailableError(OllamaError):
+class OllamaUnavailableError(OllamaError, AiUnavailableError):
     pass
 
 
 # Erro quando o modelo solicitado não está instalado.
-class OllamaModelError(OllamaError):
+class OllamaModelError(OllamaError, AiModelError):
     pass
 
 
 # Erro quando a resposta do Ollama não tem o formato esperado.
-class OllamaResponseError(OllamaError):
+class OllamaResponseError(OllamaError, AiResponseError):
     pass
 
 
 # Cliente mínimo para chat e embeddings locais.
 class OllamaClient:
+    name = "ollama"
+
     def __init__(
         self,
         host: str = "http://127.0.0.1:11434",
@@ -64,21 +73,22 @@ class OllamaClient:
         messages: list[ChatMessage | dict[str, str]],
         *,
         temperature: float = 0.1,
+        max_tokens: int | None = None,
     ) -> str:
-        normalized_messages = [
-            message.model_dump() if isinstance(message, ChatMessage) else message
-            for message in messages
-        ]
+        options: dict[str, Any] = {"temperature": temperature}
+        if max_tokens is not None:
+            options["num_predict"] = max_tokens
+
         payload = self._request(
             "POST",
             "/api/chat",
             {
                 "model": model,
-                "messages": normalized_messages,
+                "messages": normalize_messages(messages),
                 "stream": False,
                 # Evita que modelos com raciocínio gastem minutos antes da resposta.
                 "think": False,
-                "options": {"temperature": temperature},
+                "options": options,
             },
         )
 
@@ -145,6 +155,10 @@ class OllamaClient:
             if response.status_code == 404 or "not found" in detail.lower():
                 raise OllamaModelError(
                     f"Modelo ou recurso não encontrado no Ollama: {detail}"
+                )
+            if response.status_code in {401, 403}:
+                raise OllamaUnavailableError(
+                    f"O Ollama recusou a requisição: {detail}"
                 )
             raise OllamaError(
                 f"O Ollama respondeu com status {response.status_code}: {detail}"

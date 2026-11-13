@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -22,22 +23,40 @@ class SourceStorage:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
-    # Prepara e devolve o diretório da fonte.
-    def source_dir(self, workspace_id: int, source_id: int) -> Path:
-        if workspace_id < 1 or source_id < 1:
-            raise StorageError("Identificadores de workspace e fonte inválidos.")
+    # Prepara e devolve o diretório do workspace.
+    def workspace_dir(self, workspace_id: int) -> Path:
+        if workspace_id < 1:
+            raise StorageError("Identificador de workspace inválido.")
 
         path = (
-            self.settings.data_dir
-            / "workspaces"
-            / str(workspace_id)
-            / "sources"
-            / str(source_id)
+            self.settings.data_dir / "workspaces" / str(workspace_id)
         ).resolve()
         data_root = self.settings.data_dir.resolve()
         if data_root not in path.parents:
             raise StorageError("Caminho de armazenamento inválido.")
         return path
+
+    # Prepara e devolve o diretório da fonte.
+    def source_dir(self, workspace_id: int, source_id: int) -> Path:
+        if source_id < 1:
+            raise StorageError("Identificador de fonte inválido.")
+
+        workspace_dir = self.workspace_dir(workspace_id)
+        path = (workspace_dir / "sources" / str(source_id)).resolve()
+        if workspace_dir not in path.parents:
+            raise StorageError("Caminho de armazenamento inválido.")
+        return path
+
+    # Remove todos os arquivos locais de um workspace.
+    def delete_workspace(self, workspace_id: int) -> None:
+        shutil.rmtree(self.workspace_dir(workspace_id), ignore_errors=True)
+
+    # Remove os arquivos locais de uma fonte.
+    def delete_source(self, workspace_id: int, source_id: int) -> None:
+        shutil.rmtree(
+            self.source_dir(workspace_id, source_id),
+            ignore_errors=True,
+        )
 
     # Persiste o original, o texto extraído e os metadados.
     def save(

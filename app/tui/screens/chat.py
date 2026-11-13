@@ -10,9 +10,15 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Input, RichLog, Static, TabbedContent
 
-from app.schemas.rag import ChatAnswer, ChatMessage, ChatStatus
+from app.schemas.rag import (
+    ChatAnswer,
+    ChatMessage,
+    ChatStatus,
+    answer_from_record,
+)
 from app.tui.labels import RETRIEVAL_MODE_LABELS, label_for
 from app.tui.services import TuiServices
+from app.tui.widgets.modals import ConfirmModal
 from app.tui.workers import run_blocking
 
 
@@ -61,7 +67,40 @@ class ChatPane(Widget):
         self._refresh_status()
         self._write(
             "Agente de Editais",
-            "Pergunte sobre o edital e as fontes indexadas desta área de trabalho.",
+            "Pergunte sobre o edital ou peça sugestões. As fontes indexadas "
+            "serão usadas quando estiverem disponíveis.",
+        )
+        self._restore_conversation()
+
+    # Recupera e exibe a conversa salva da área de trabalho.
+    def _restore_conversation(self) -> None:
+        try:
+            records = self.services.chat.conversation(self.workspace_id)
+        except Exception as exc:  # noqa: BLE001
+            self._write("Erro", f"Não foi possível carregar a conversa salva: {exc}")
+            return
+
+        if not records:
+            return
+
+        for record in records:
+            if record.role == "user":
+                self._write("Você", record.content)
+                continue
+
+            answer = answer_from_record(record)
+            self._write(
+                "Agente",
+                _format_answer(answer) if answer is not None else record.content,
+            )
+
+        self.history = [
+            ChatMessage(role=record.role, content=record.content)
+            for record in records
+        ]
+        self._write(
+            "Agente de Editais",
+            f"Conversa anterior restaurada ({len(records)} mensagens).",
         )
 
     # Atualiza o cabeçalho com a situação do índice.
@@ -147,6 +186,28 @@ class ChatPane(Widget):
         self.query_one("#chat-input", Input).focus()
 
     def _clear(self) -> None:
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    "Limpar toda a conversa salva desta área de trabalho? "
+                    "As perguntas e respostas antigas serão removidas. "
+                    "Esta ação não pode ser desfeita."
+                ),
+                title="Limpar conversa",
+            ),
+            self._after_clear,
+        )
+
+    async def _after_clear(self, confirmed: object) -> None:
+        if confirmed is not True:
+            return
+
+        try:
+            self.services.chat.clear_conversation(self.workspace_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao limpar conversa: {exc}", severity="error")
+            return
+
         self.query_one("#chat-log", RichLog).clear()
         self.history.clear()
         self._write(

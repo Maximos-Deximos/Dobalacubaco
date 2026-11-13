@@ -158,7 +158,7 @@ def test_model_change_reindexes(isolated_database) -> None:
     init_db()
     workspace_id, _source_id = make_source()
     IndexingService(embedder=FakeEmbedder()).index_workspace(workspace_id)
-    settings = replace(get_settings(), ollama_embed_model="outro-modelo")
+    settings = replace(get_settings(), ai_embed_model="outro-modelo")
 
     result = IndexingService(
         settings=settings,

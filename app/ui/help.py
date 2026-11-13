@@ -36,7 +36,7 @@ HELP_ENTRIES: tuple[CommandHelp, ...] = (
     ),
     CommandHelp(
         name="doctor",
-        summary="verifica configuração, banco, Ollama e Playwright",
+        summary="verifica configuração, banco, provedor de IA e Playwright",
         usage="doctor",
         examples=("doctor",),
     ),
@@ -113,14 +113,58 @@ HELP_ENTRIES: tuple[CommandHelp, ...] = (
         category="Fontes",
     ),
     CommandHelp(
+        name="pdf fields",
+        summary="lista os campos AcroForm de uma fonte PDF",
+        usage="pdf fields --source ID [--json]",
+        category="PDF",
+        examples=("pdf fields --source 1",),
+    ),
+    CommandHelp(
+        name="pdf suggest",
+        summary="gera sugestões por campo com perfil, vetores e IA",
+        usage="pdf suggest --source ID [--instructions TEXTO] [--refresh] [--new] [--json] [--output CAMINHO]",
+        category="PDF",
+        examples=("pdf suggest --source 1 --refresh",),
+    ),
+    CommandHelp(
+        name="pdf show",
+        summary="exibe uma sessão de preenchimento de PDF",
+        usage="pdf show SESSION_ID [--json]",
+        category="PDF",
+    ),
+    CommandHelp(
+        name="pdf set",
+        summary="edita manualmente um campo de PDF",
+        usage="pdf set SESSION_ID CAMPO VALOR [--approve] [--json]",
+        category="PDF",
+    ),
+    CommandHelp(
+        name="pdf approve",
+        summary="aprova um ou todos os campos de uma sessão",
+        usage="pdf approve SESSION_ID [--field CAMPO | --all] [--json]",
+        category="PDF",
+    ),
+    CommandHelp(
+        name="pdf fill",
+        summary="grava uma cópia preenchida do PDF",
+        usage="pdf fill SESSION_ID --output CAMINHO [--values JSON] [--flatten] [--json]",
+        category="PDF",
+        related=("pdf suggest", "pdf show"),
+    ),
+    CommandHelp(
         name="chat ask",
-        summary="faz uma pergunta à área de trabalho indexada",
+        summary=(
+            "faz uma pergunta, retoma a conversa salva e grava a nova troca"
+        ),
         usage="chat ask PERGUNTA --workspace ID [--top-k N] [--json]",
         category="Chat",
     ),
     CommandHelp(
         name="chat repl",
-        summary="inicia uma conversa interativa",
+        summary=(
+            "inicia uma conversa interativa com histórico persistente; "
+            "use /history [N] e /clear no prompt"
+        ),
         usage="chat repl --workspace ID [--top-k N]",
         category="Chat",
     ),

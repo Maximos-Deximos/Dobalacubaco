@@ -118,6 +118,18 @@ class ProposalRepository:
                 )
             return _to_detail(model)
 
+    # Exclui uma proposta, suas seções e seu histórico.
+    def delete(self, proposal_id: int) -> Proposal:
+        with session_scope(self.database_url) as session:
+            model = session.get(ProposalModel, proposal_id)
+            if model is None:
+                raise ProposalNotFoundError(
+                    f"Proposta {proposal_id} não encontrada."
+                )
+            proposal = _to_proposal(model)
+            session.delete(model)
+            return proposal
+
     # Lista todas as propostas em ordem de criação.
     def list_all(self) -> list[Proposal]:
         with session_scope(self.database_url) as session:

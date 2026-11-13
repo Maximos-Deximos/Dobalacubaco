@@ -18,7 +18,7 @@ from app.tui.labels import (
     label_for,
 )
 from app.tui.services import TuiServices
-from app.tui.widgets.modals import ProposalCreateModal
+from app.tui.widgets.modals import ConfirmModal, ProposalCreateModal
 
 
 # Tela de leitura de uma proposta e seu sumário de seções.
@@ -119,6 +119,7 @@ class ProposalScreen(Screen):
 class ProposalsScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("n", "new_proposal", "Nova"),
+        ("d", "delete_proposal", "Excluir"),
         ("r", "refresh", "Atualizar"),
         ("escape", "back", "Voltar"),
     ]
@@ -133,6 +134,7 @@ class ProposalsScreen(Screen):
         self.services = services
         self.workspace_id = workspace_id
         self._table_ready = False
+        self._pending_delete_id: int | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -145,6 +147,7 @@ class ProposalsScreen(Screen):
             with Horizontal(classes="actions"):
                 yield Button("Nova proposta", id="new", variant="primary")
                 yield Button("Abrir", id="open")
+                yield Button("Excluir", id="delete", variant="error")
                 yield Button("Atualizar", id="refresh")
                 yield Button("Voltar", id="back")
         yield Footer()
@@ -195,6 +198,49 @@ class ProposalsScreen(Screen):
             return
         self.app.push_screen(ProposalScreen(self.services, proposal_id))
 
+    def action_delete_proposal(self) -> None:
+        proposal_id = self._selected_id()
+        if proposal_id is None:
+            self.notify("Selecione uma proposta.", severity="warning")
+            return
+
+        try:
+            proposal = self.services.proposals.get(proposal_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao carregar proposta: {exc}", severity="error")
+            return
+
+        self._pending_delete_id = proposal_id
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    f"Excluir a proposta '{proposal.title}'? As seções e o "
+                    "histórico de revisões também serão removidos. "
+                    "Esta ação não pode ser desfeita."
+                ),
+                title="Excluir proposta",
+            ),
+            self._after_delete,
+        )
+
+    async def _after_delete(self, confirmed: object) -> None:
+        proposal_id = self._pending_delete_id
+        self._pending_delete_id = None
+        if confirmed is not True or proposal_id is None:
+            return
+
+        try:
+            proposal = self.services.proposals.delete(proposal_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao excluir proposta: {exc}", severity="error")
+            return
+
+        self._load()
+        self.notify(
+            f"Proposta '{proposal.title}' excluída.",
+            severity="information",
+        )
+
     def action_new_proposal(self) -> None:
         try:
             workspaces = self.services.workspaces.list_all()
@@ -238,6 +284,8 @@ class ProposalsScreen(Screen):
                 self.action_new_proposal()
             case "open":
                 self._open_selected()
+            case "delete":
+                self.action_delete_proposal()
             case "refresh":
                 self._load()
             case "back":
@@ -260,6 +308,7 @@ class ProposalsScreen(Screen):
 class ProposalsPane(Widget):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("n", "new_proposal", "Nova"),
+        ("d", "delete_proposal", "Excluir"),
         ("r", "refresh", "Atualizar"),
     ]
 
@@ -268,6 +317,7 @@ class ProposalsPane(Widget):
         self.services = services
         self.workspace_id = workspace_id
         self._table_ready = False
+        self._pending_delete_id: int | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="pane-body"):
@@ -276,6 +326,7 @@ class ProposalsPane(Widget):
             with Horizontal(classes="actions"):
                 yield Button("Nova proposta", id="new", variant="primary")
                 yield Button("Abrir", id="open")
+                yield Button("Excluir", id="delete", variant="error")
                 yield Button("Atualizar", id="refresh")
 
     def on_mount(self) -> None:
@@ -318,6 +369,49 @@ class ProposalsPane(Widget):
             return
         self.app.push_screen(ProposalScreen(self.services, proposal_id))
 
+    def action_delete_proposal(self) -> None:
+        proposal_id = self._selected_id()
+        if proposal_id is None:
+            self.notify("Selecione uma proposta.", severity="warning")
+            return
+
+        try:
+            proposal = self.services.proposals.get(proposal_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao carregar proposta: {exc}", severity="error")
+            return
+
+        self._pending_delete_id = proposal_id
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    f"Excluir a proposta '{proposal.title}'? As seções e o "
+                    "histórico de revisões também serão removidos. "
+                    "Esta ação não pode ser desfeita."
+                ),
+                title="Excluir proposta",
+            ),
+            self._after_delete,
+        )
+
+    async def _after_delete(self, confirmed: object) -> None:
+        proposal_id = self._pending_delete_id
+        self._pending_delete_id = None
+        if confirmed is not True or proposal_id is None:
+            return
+
+        try:
+            proposal = self.services.proposals.delete(proposal_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao excluir proposta: {exc}", severity="error")
+            return
+
+        self._load()
+        self.notify(
+            f"Proposta '{proposal.title}' excluída.",
+            severity="information",
+        )
+
     def action_new_proposal(self) -> None:
         try:
             workspaces = self.services.workspaces.list_all()
@@ -353,6 +447,8 @@ class ProposalsPane(Widget):
                 self.action_new_proposal()
             case "open":
                 self._open_selected()
+            case "delete":
+                self.action_delete_proposal()
             case "refresh":
                 self._load()
 

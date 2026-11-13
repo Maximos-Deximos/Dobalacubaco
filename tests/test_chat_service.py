@@ -4,7 +4,10 @@ from dataclasses import replace
 
 import pytest
 
-from app.ai.promts import INSUFFICIENT_EVIDENCE
+from app.ai.promts import (
+    NO_INDEXED_SOURCES_WARNING,
+    NO_RELEVANT_EXCERPTS_WARNING,
+)
 from app.application.chat_service import ChatService, ChatServiceError
 from app.application.workspace_service import WorkspaceService
 from app.config import get_settings
@@ -24,7 +27,14 @@ class FakeChatClient:
         self.messages = []
         self.calls = 0
 
-    def chat(self, model: str, messages, *, temperature: float = 0.1) -> str:
+    def chat(
+        self,
+        model: str,
+        messages,
+        *,
+        temperature: float = 0.1,
+        max_tokens: int | None = None,
+    ) -> str:
         self.calls += 1
         self.messages = messages
         return self.answer
@@ -89,7 +99,7 @@ def test_ask_returns_answer_with_citation(isolated_database) -> None:
 
     assert answer.answer == "O prazo é de 30 dias [F1]."
     assert answer.mode == RetrievalMode.LEXICAL
-    assert answer.model == get_settings().ollama_model
+    assert answer.model == get_settings().ai_model
     assert answer.retrieved_count == 1
     assert answer.citations
     assert answer.citations[0].marker == "F1"
@@ -97,17 +107,41 @@ def test_ask_returns_answer_with_citation(isolated_database) -> None:
     assert client.calls == 1
 
 
-# Não chama o modelo quando não há contexto.
-def test_ask_without_context_skips_model(isolated_database) -> None:
+# Responde com orientação geral quando não há fontes indexadas.
+def test_ask_without_sources_calls_model(isolated_database) -> None:
     init_db()
     workspace = WorkspaceService().create("Workspace Vazio")
-    client = FakeChatClient()
+    client = FakeChatClient("Posso sugerir uma estrutura geral.")
 
     answer = make_service(workspace.id, client).ask(workspace.id, "Qual o prazo?")
 
-    assert answer.answer == INSUFFICIENT_EVIDENCE
+    assert answer.answer == "Posso sugerir uma estrutura geral."
     assert answer.citations == []
-    assert client.calls == 0
+    assert answer.retrieved_count == 0
+    assert answer.mode is None
+    assert NO_INDEXED_SOURCES_WARNING in answer.warnings
+    assert client.calls == 1
+    assert "Nenhum trecho de fonte indexada" in client.messages[0].content
+    assert "Fontes disponíveis" not in client.messages[-1].content
+
+
+# Responde mesmo quando há fontes, mas nenhum trecho relevante.
+def test_ask_without_relevant_chunks_calls_model(isolated_database) -> None:
+    init_db()
+    workspace_id = make_workspace_with_chunk()
+    client = FakeChatClient("Sugestão geral sem citar fontes.")
+
+    answer = make_service(workspace_id, client).ask(
+        workspace_id,
+        "xyzabc",
+    )
+
+    assert answer.answer == "Sugestão geral sem citar fontes."
+    assert answer.citations == []
+    assert answer.retrieved_count == 0
+    assert answer.mode == RetrievalMode.LEXICAL
+    assert NO_RELEVANT_EXCERPTS_WARNING in answer.warnings
+    assert client.calls == 1
 
 
 # Limita o histórico enviado ao modelo.

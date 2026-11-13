@@ -11,14 +11,14 @@ from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Footer, Header, Static
 
-from app.schemas.source import Source, SourceDetail
+from app.schemas.source import Source, SourceDetail, SourceKind
 from app.tui.labels import (
     SOURCE_KIND_LABELS,
     SOURCE_STATUS_LABELS,
     label_for,
 )
 from app.tui.services import TuiServices
-from app.tui.widgets.modals import SourceFileModal, SourceUrlModal
+from app.tui.widgets.modals import ConfirmModal, SourceFileModal, SourceUrlModal
 from app.tui.workers import run_blocking
 
 
@@ -33,6 +33,7 @@ class SourcesPane(Widget):
         ("a", "new_url", "Adicionar URL"),
         ("f", "new_file", "Adicionar arquivo"),
         ("i", "index", "Indexar"),
+        ("d", "delete", "Excluir"),
         ("r", "refresh", "Atualizar"),
     ]
 
@@ -48,6 +49,7 @@ class SourcesPane(Widget):
         self.workspace_name = workspace_name
         self._table_ready = False
         self._busy = False
+        self._pending_delete_id: int | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="pane-body"):
@@ -63,6 +65,7 @@ class SourcesPane(Widget):
                 yield Button("Adicionar arquivo", id="add-file")
                 yield Button("Indexar selecionada", id="index-one")
                 yield Button("Indexar todas", id="index-all")
+                yield Button("Excluir", id="delete-source", variant="error")
                 yield Button("Atualizar", id="refresh")
 
     def on_mount(self) -> None:
@@ -113,6 +116,7 @@ class SourcesPane(Widget):
             "#add-file",
             "#index-one",
             "#index-all",
+            "#delete-source",
             "#refresh",
         ):
             self.query_one(button_id, Button).disabled = busy
@@ -239,12 +243,67 @@ class SourcesPane(Widget):
         self._status(message)
         self.notify(message, severity="information")
 
+    # Abre a confirmação de exclusão da fonte selecionada.
+    def action_delete(self) -> None:
+        if self._busy:
+            return
+        source_id = self._selected_source_id()
+        if source_id is None:
+            self.notify("Selecione uma fonte para excluir.", severity="warning")
+            return
+
+        try:
+            detail = self.services.sources.get_source(source_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao carregar fonte: {exc}", severity="error")
+            return
+
+        self._pending_delete_id = source_id
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    f"Excluir a fonte '{detail.title or detail.id}'? "
+                    "O snapshot, os trechos indexados, os arquivos locais e "
+                    "os PDFs vinculados também serão removidos. "
+                    "Esta ação não pode ser desfeita."
+                ),
+                title="Excluir fonte",
+            ),
+            self._after_delete,
+        )
+
+    async def _after_delete(self, confirmed: object) -> None:
+        source_id = self._pending_delete_id
+        self._pending_delete_id = None
+        if confirmed is not True or source_id is None:
+            return
+
+        self._set_busy(True, "Excluindo fonte...")
+        try:
+            deleted = await run_blocking(
+                self,
+                self.services.sources.delete_source,
+                source_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._set_busy(False)
+            self._status(f"Erro ao excluir fonte: {exc}", error=True)
+            return
+
+        self._set_busy(False)
+        self._load()
+        message = f"Fonte '{deleted.title or deleted.id}' excluída."
+        self._status(message)
+        self.notify(message, severity="information")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "add-url":
                 self.action_new_url()
             case "add-file":
                 self.action_new_file()
+            case "delete-source":
+                self.action_delete()
             case "index-one":
                 source_id = self._selected_source_id()
                 if source_id is None:
@@ -275,12 +334,14 @@ class SourceDetailScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("escape", "back", "Voltar"),
         ("r", "reload", "Atualizar"),
+        ("p", "pdf_form", "Preencher PDF"),
     ]
 
     def __init__(self, services: TuiServices, source_id: int) -> None:
         super().__init__()
         self.services = services
         self.source_id = source_id
+        self.detail: SourceDetail | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -293,6 +354,12 @@ class SourceDetailScreen(Screen):
             with Horizontal(classes="actions"):
                 yield Button("Voltar", id="back")
                 yield Button("Atualizar", id="refresh")
+                yield Button(
+                    "Preencher PDF",
+                    id="pdf-form",
+                    variant="primary",
+                    disabled=True,
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -305,6 +372,7 @@ class SourceDetailScreen(Screen):
             self.notify(f"Erro ao carregar fonte: {exc}", severity="error")
             return
 
+        self.detail = detail
         self.query_one("#source-title", Static).update(
             detail.title or f"Fonte {detail.id}"
         )
@@ -318,18 +386,37 @@ class SourceDetailScreen(Screen):
         self.query_one("#source-preview", Static).update(
             f"Prévia do conteúdo:\n\n{preview or '(sem texto extraído)'}"
         )
+        can_fill = bool(
+            detail.source_kind in {SourceKind.WEB_PDF, SourceKind.UPLOADED_PDF}
+            and detail.snapshot is not None
+            and detail.snapshot.raw_path
+        )
+        self.query_one("#pdf-form", Button).disabled = not can_fill
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back":
             self.action_back()
         elif event.button.id == "refresh":
             self._load()
+        elif event.button.id == "pdf-form":
+            self.action_pdf_form()
 
     def action_back(self) -> None:
         self.app.pop_screen()
 
     def action_reload(self) -> None:
         self._load()
+
+    def action_pdf_form(self) -> None:
+        if self.detail is None or self.detail.source_kind not in {
+            SourceKind.WEB_PDF,
+            SourceKind.UPLOADED_PDF,
+        }:
+            self.notify("A fonte selecionada não é um PDF.", severity="warning")
+            return
+        from app.tui.screens.pdf_form import PdfFormScreen
+
+        self.app.push_screen(PdfFormScreen(self.services, self.source_id))
 
 
 # Monta os metadados exibidos no detalhe da fonte.

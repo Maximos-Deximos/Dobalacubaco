@@ -23,6 +23,14 @@ from app.ui.cli import (
     command_profile_show,
 )
 from app.ui.help_cli import command_help
+from app.ui.pdf_cli import (
+    command_pdf_approve,
+    command_pdf_fields,
+    command_pdf_fill,
+    command_pdf_set,
+    command_pdf_show,
+    command_pdf_suggest,
+)
 from app.ui.proposal_cli import (
     command_proposal_list,
     command_proposal_new,
@@ -439,11 +447,166 @@ def _add_source_parser(subparsers: argparse._SubParsersAction) -> None:
     source_show.set_defaults(func=command_source_show)
 
 
+# Registra os subcomandos de PDF.
+def _add_pdf_parser(subparsers: argparse._SubParsersAction) -> None:
+    pdf = subparsers.add_parser(
+        "pdf",
+        help="inspeciona, sugere e preenche formulários PDF",
+    )
+    pdf_subparsers = pdf.add_subparsers(
+        dest="pdf_command",
+        required=True,
+    )
+
+    pdf_fields = pdf_subparsers.add_parser(
+        "fields",
+        help="lista os campos AcroForm de uma fonte PDF",
+    )
+    pdf_fields.add_argument(
+        "--source",
+        type=int,
+        required=True,
+        dest="source_id",
+        help="ID da fonte PDF",
+    )
+    pdf_fields.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_fields.set_defaults(func=command_pdf_fields)
+
+    pdf_suggest = pdf_subparsers.add_parser(
+        "suggest",
+        help="gera sugestões por campo com perfil, vetores e IA",
+    )
+    pdf_suggest.add_argument(
+        "--source",
+        type=int,
+        required=True,
+        dest="source_id",
+        help="ID da fonte PDF",
+    )
+    pdf_suggest.add_argument(
+        "--instructions",
+        default="",
+        help="instruções adicionais para as sugestões",
+    )
+    pdf_suggest.add_argument(
+        "--refresh",
+        action="store_true",
+        help="regenera sugestões preservando edições manuais",
+    )
+    pdf_suggest.add_argument(
+        "--new",
+        action="store_true",
+        help="cria uma nova sessão em vez de reutilizar a aberta",
+    )
+    pdf_suggest.add_argument(
+        "--output",
+        default=None,
+        help="grava as sugestões em um arquivo JSON",
+    )
+    pdf_suggest.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_suggest.set_defaults(func=command_pdf_suggest)
+
+    pdf_show = pdf_subparsers.add_parser(
+        "show",
+        help="exibe uma sessão de preenchimento",
+    )
+    pdf_show.add_argument("session_id", type=int, help="ID da sessão")
+    pdf_show.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_show.set_defaults(func=command_pdf_show)
+
+    pdf_set = pdf_subparsers.add_parser(
+        "set",
+        help="edita manualmente um campo da sessão",
+    )
+    pdf_set.add_argument("session_id", type=int, help="ID da sessão")
+    pdf_set.add_argument("field_name", help="nome do campo PDF")
+    pdf_set.add_argument("value", help="novo valor do campo")
+    pdf_set.add_argument(
+        "--approve",
+        action="store_true",
+        help="aprova o campo após a edição",
+    )
+    pdf_set.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_set.set_defaults(func=command_pdf_set)
+
+    pdf_approve = pdf_subparsers.add_parser(
+        "approve",
+        help="aprova um ou todos os campos",
+    )
+    pdf_approve.add_argument("session_id", type=int, help="ID da sessão")
+    pdf_approve.add_argument(
+        "--field",
+        default=None,
+        dest="field_name",
+        help="nome do campo a aprovar",
+    )
+    pdf_approve.add_argument(
+        "--all",
+        action="store_true",
+        help="aprova todos os campos com valor",
+    )
+    pdf_approve.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_approve.set_defaults(func=command_pdf_approve)
+
+    pdf_fill = pdf_subparsers.add_parser(
+        "fill",
+        help="grava uma cópia preenchida do PDF",
+    )
+    pdf_fill.add_argument("session_id", type=int, help="ID da sessão")
+    pdf_fill.add_argument(
+        "--output",
+        required=True,
+        help="caminho do novo PDF preenchido",
+    )
+    pdf_fill.add_argument(
+        "--values",
+        default=None,
+        help="arquivo JSON com valores para aplicar antes de preencher",
+    )
+    pdf_fill.add_argument(
+        "--flatten",
+        action="store_true",
+        help="achata as aparências dos campos no PDF",
+    )
+    pdf_fill.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="exibe o resultado em JSON",
+    )
+    pdf_fill.set_defaults(func=command_pdf_fill)
+
+
 # Registra os subcomandos de chat.
 def _add_chat_parser(subparsers: argparse._SubParsersAction) -> None:
     chat = subparsers.add_parser(
         "chat",
-        help="conversa com as fontes indexadas",
+        help="conversa com o agente e usa fontes quando disponíveis",
     )
     chat_subparsers = chat.add_subparsers(
         dest="chat_command",
@@ -452,7 +615,7 @@ def _add_chat_parser(subparsers: argparse._SubParsersAction) -> None:
 
     chat_ask = chat_subparsers.add_parser(
         "ask",
-        help="faz uma pergunta única ao workspace",
+        help="faz uma pergunta única à área de trabalho",
     )
     chat_ask.add_argument("question", help="pergunta em linguagem natural")
     chat_ask.add_argument(
@@ -533,7 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser(
         "doctor",
-        help="verifica configuração, banco, Ollama e Playwright",
+        help="verifica configuração, banco, provedor de IA e Playwright",
     )
     doctor.set_defaults(func=command_doctor)
 
@@ -543,6 +706,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_inspect_parser(subparsers)
     _add_workspace_parser(subparsers)
     _add_source_parser(subparsers)
+    _add_pdf_parser(subparsers)
     _add_chat_parser(subparsers)
     _add_proposal_parser(subparsers)
 

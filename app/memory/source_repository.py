@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.memory.database import session_scope
 from app.memory.models import SourceModel, SourceSnapshotModel
@@ -185,6 +186,55 @@ class SourceRepository:
             source = _to_source(model)
             snapshot = _to_snapshot(model.snapshot) if model.snapshot else None
             return SourceDetail(**source.model_dump(), snapshot=snapshot)
+
+    # Lista a fonte e todos os seus descendentes (PDFs vinculados).
+    def list_tree(self, source_id: int) -> list[Source]:
+        with session_scope(self.database_url) as session:
+            model = session.get(SourceModel, source_id)
+            if model is None:
+                raise SourceNotFoundError(f"Fonte {source_id} não encontrada.")
+
+            items: list[Source] = []
+            self._collect_tree(session, model, items)
+            return items
+
+    # Exclui uma fonte, seus descendentes, snapshot e trechos indexados.
+    def delete(self, source_id: int) -> Source:
+        with session_scope(self.database_url) as session:
+            model = session.get(SourceModel, source_id)
+            if model is None:
+                raise SourceNotFoundError(f"Fonte {source_id} não encontrada.")
+
+            deleted = _to_source(model)
+            self._delete_tree(session, model)
+            return deleted
+
+    # Coleta recursivamente a fonte e seus descendentes.
+    def _collect_tree(
+        self,
+        session: Session,
+        model: SourceModel,
+        items: list[Source],
+    ) -> None:
+        items.append(_to_source(model))
+        children = session.scalars(
+            select(SourceModel)
+            .where(SourceModel.parent_source_id == model.id)
+            .order_by(SourceModel.id)
+        ).all()
+        for child in children:
+            self._collect_tree(session, child, items)
+
+    # Remove recursivamente a fonte e seus descendentes.
+    def _delete_tree(self, session: Session, model: SourceModel) -> None:
+        children = session.scalars(
+            select(SourceModel)
+            .where(SourceModel.parent_source_id == model.id)
+            .order_by(SourceModel.id)
+        ).all()
+        for child in children:
+            self._delete_tree(session, child)
+        session.delete(model)
 
     # Lista as fontes de um workspace.
     def list_by_workspace(self, workspace_id: int) -> list[Source]:

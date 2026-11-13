@@ -65,3 +65,40 @@ FIELD_TYPE_LABELS = {
 def label_for(labels: dict[str, str], value: object) -> str:
     key = str(getattr(value, "value", value))
     return labels.get(key, key)
+
+
+PDF_SESSION_STATUS_LABELS = {
+    "draft": "Rascunho",
+    "suggested": "Sugerida",
+    "reviewing": "Em revisão",
+    "ready": "Pronta",
+    "filled": "Preenchida",
+    "failed": "Falhou",
+}
+
+PDF_FIELD_STATUS_LABELS = {
+    "pending": "Pendente",
+    "suggested": "Sugerido",
+    "edited": "Editado",
+    "approved": "Aprovado",
+    "skipped": "Ignorado",
+    "filled": "Preenchido",
+    "failed": "Falhou",
+}
+
+PDF_FIELD_TYPE_LABELS = {
+    "text": "Texto",
+    "textarea": "Texto longo",
+    "checkbox": "Caixa",
+    "radio": "Escolha",
+    "choice": "Seleção",
+    "signature": "Assinatura",
+    "unknown": "Desconhecido",
+}
+
+PDF_SUGGESTION_SOURCE_LABELS = {
+    "profile": "Perfil",
+    "vector": "Memória vetorial",
+    "ai": "IA",
+    "manual": "Manual",
+}

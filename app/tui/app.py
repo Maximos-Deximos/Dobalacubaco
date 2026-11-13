@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from typing import ClassVar
 
-from textual.app import App
+from textual.app import App, SystemCommand
 from textual.binding import Binding, BindingType
+from textual.screen import Screen
 
 from app.memory.database import init_db
 from app.tui.screens.help import HelpScreen
@@ -148,6 +150,54 @@ TabPane {
 #source-content, #profile-content {
     height: 1fr;
 }
+
+.pdf-form-body {
+    height: 1fr;
+}
+
+.pdf-main {
+    height: 1fr;
+    min-height: 10;
+}
+
+.pdf-fields-column {
+    width: 1fr;
+    height: 1fr;
+}
+
+.pdf-editor {
+    width: 44;
+    height: 1fr;
+    border: round $primary;
+    padding: 0 1;
+    margin-left: 1;
+    overflow-y: auto;
+}
+
+.pdf-editor Static {
+    margin-bottom: 1;
+}
+
+.pdf-editor Input, .pdf-editor TextArea, .pdf-editor Select {
+    margin-bottom: 1;
+}
+
+.pdf-editor TextArea {
+    height: 6;
+}
+
+.pdf-warnings {
+    height: 5;
+    min-height: 3;
+    border: round $warning;
+    padding: 0 1;
+    margin-top: 1;
+}
+
+#pdf-form-progress {
+    height: 1;
+    margin-bottom: 1;
+}
 """
 
 
@@ -173,6 +223,37 @@ class ProposalTuiApp(App):
         if isinstance(self.screen, HelpScreen):
             return
         self.push_screen(HelpScreen())
+
+    def get_system_commands(
+        self,
+        screen: Screen,
+    ) -> Iterable[SystemCommand]:
+        yield SystemCommand(
+            "Sair",
+            "Encerra o aplicativo.",
+            self.action_quit,
+        )
+        if screen.query("HelpPanel"):
+            yield SystemCommand(
+                "Teclas",
+                "Oculta o painel de ajuda das teclas.",
+                self.action_hide_help_panel,
+            )
+        else:
+            yield SystemCommand(
+                "Teclas",
+                "Mostra os atalhos do campo em foco e da tela.",
+                self.action_show_help_panel,
+            )
+
+    def action_help_quit(self) -> None:
+        for key, active_binding in self.active_bindings.items():
+            if active_binding.binding.action in ("quit", "app.quit"):
+                self.notify(
+                    f"Pressione [b]{key}[/b] para sair do aplicativo.",
+                    title="Deseja sair?",
+                )
+                return
 
 
 # Abre a interface de terminal, exigindo um TTY interativo.

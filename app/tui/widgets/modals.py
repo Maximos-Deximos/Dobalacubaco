@@ -236,3 +236,34 @@ class ConfirmModal(ModalScreen[bool]):
 
     def action_no(self) -> None:
         self.dismiss(False)
+
+
+# Modal para escolher o caminho do PDF preenchido.
+class PdfOutputModal(FormModal):
+    def __init__(self, default_path: str) -> None:
+        super().__init__()
+        self.default_path = default_path
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal"):
+            yield Static("Salvar PDF preenchido", classes="modal-title")
+            yield Label("Caminho do novo PDF")
+            yield Input(value=self.default_path, id="pdf-output-path")
+            yield Static(
+                "O arquivo original nunca será sobrescrito.",
+                classes="hint",
+            )
+            yield from self._buttons()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(None)
+            return
+        if event.button.id != "save":
+            return
+
+        path = self.query_one("#pdf-output-path", Input).value.strip()
+        if not path:
+            self.notify("Informe o caminho de saída.", severity="warning")
+            return
+        self.dismiss(path)

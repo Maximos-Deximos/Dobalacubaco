@@ -1,1 +1,1 @@
-# Componentes de integração com a IA local via Ollama.
+# Componentes de integração com provedores locais e externos de IA.

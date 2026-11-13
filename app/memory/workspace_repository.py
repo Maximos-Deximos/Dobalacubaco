@@ -61,6 +61,18 @@ class WorkspaceRepository:
                 )
             return _to_schema(model)
 
+    # Exclui um workspace e os dados vinculados.
+    def delete(self, workspace_id: int) -> Workspace:
+        with session_scope(self.database_url) as session:
+            model = session.get(WorkspaceModel, workspace_id)
+            if model is None:
+                raise WorkspaceNotFoundError(
+                    f"Área de trabalho {workspace_id} não encontrada."
+                )
+            workspace = _to_schema(model)
+            session.delete(model)
+            return workspace
+
     # Busca um workspace pelo nome.
     def get_by_name(self, name: str) -> Workspace | None:
         with session_scope(self.database_url) as session:

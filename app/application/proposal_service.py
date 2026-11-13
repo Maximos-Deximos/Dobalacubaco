@@ -49,6 +49,10 @@ class ProposalService:
     def get(self, proposal_id: int) -> ProposalDetail:
         return self.repository.get(proposal_id)
 
+    # Exclui uma proposta, suas seções e seu histórico.
+    def delete(self, proposal_id: int) -> Proposal:
+        return self.repository.delete(proposal_id)
+
     # Lista todas as propostas.
     def list_all(self) -> list[Proposal]:
         return self.repository.list_all()

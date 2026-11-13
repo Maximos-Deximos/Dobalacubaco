@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 import sys
 
-from app.ai.ollama_client import OllamaError
+from app.ai.provider import AiError
 from app.application.chat_service import ChatService, ChatServiceError
 from app.memory.database import init_db
 from app.memory.workspace_repository import WorkspaceNotFoundError
-from app.schemas.rag import ChatAnswer, ChatMessage, ChatStatus
+from app.schemas.rag import ChatAnswer, ChatStatus, answer_from_record
 
 
 # Executa uma pergunta única ao workspace.
@@ -23,7 +23,7 @@ def command_chat_ask(args: argparse.Namespace) -> int:
             args.question,
             top_k=args.top_k,
         )
-    except (WorkspaceNotFoundError, ChatServiceError, OllamaError, ValueError) as exc:
+    except (WorkspaceNotFoundError, ChatServiceError, AiError, ValueError) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
 
@@ -58,15 +58,20 @@ def command_chat_status(args: argparse.Namespace) -> int:
 def command_chat_repl(args: argparse.Namespace) -> int:
     init_db()
     service = ChatService()
-    history: list[ChatMessage] = []
 
     try:
         service.status(args.workspace_id)
+        saved = len(service.conversation(args.workspace_id))
     except WorkspaceNotFoundError as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
 
     print("Chat local iniciado. Use /help para ver os comandos e /exit para sair.")
+    if saved:
+        print(
+            f"Histórico restaurado: {saved} mensagens. "
+            "Use /history [N] para revisar as antigas."
+        )
 
     while True:
         try:
@@ -85,15 +90,22 @@ def command_chat_repl(args: argparse.Namespace) -> int:
             if command in {"/exit", "/quit"}:
                 return 0
             if command == "/clear":
-                history.clear()
-                print("Histórico limpo.")
+                try:
+                    removed = service.clear_conversation(args.workspace_id)
+                except WorkspaceNotFoundError as exc:
+                    print(f"Erro: {exc}", file=sys.stderr)
+                    continue
+                print(f"Histórico limpo ({removed} mensagens removidas).")
                 continue
             if command == "/sources":
                 _print_sources(service, args.workspace_id)
                 continue
+            if command.startswith("/history"):
+                _print_history(service, args.workspace_id, question)
+                continue
             if command == "/help":
                 print(
-                    "Comandos: /sources, /clear, /help, /exit. "
+                    "Comandos: /sources, /history [N], /clear, /help, /exit. "
                     "Digite uma pergunta para consultar as fontes."
                 )
                 continue
@@ -101,19 +113,17 @@ def command_chat_repl(args: argparse.Namespace) -> int:
             continue
 
         try:
+            # O serviço retoma a conversa salva e grava a nova troca.
             answer = service.ask(
                 args.workspace_id,
                 question,
                 top_k=args.top_k,
-                history=history,
             )
-        except (ChatServiceError, OllamaError, ValueError) as exc:
+        except (ChatServiceError, AiError, ValueError) as exc:
             print(f"Erro: {exc}", file=sys.stderr)
             continue
 
         _print_answer(answer)
-        history.append(ChatMessage(role="user", content=question))
-        history.append(ChatMessage(role="assistant", content=answer.answer))
 
 
 # Imprime a resposta e as fontes citadas.
@@ -151,6 +161,48 @@ def _print_status(status: ChatStatus) -> None:
     print(f"Trechos: {status.chunks_total}")
     print(f"Trechos com embeddings: {status.chunks_embedded}")
     print(f"Modelo de embedding: {status.embedding_model or '(não configurado)'}")
+
+
+# Exibe as mensagens antigas salvas, opcionalmente limitadas.
+def _print_history(service: ChatService, workspace_id: int, raw: str) -> None:
+    parts = raw.split(maxsplit=1)
+    limit: int | None = 20
+
+    if len(parts) > 1:
+        value = parts[1].strip().lower()
+        if value in {"all", "tudo"}:
+            limit = None
+        else:
+            try:
+                limit = int(value)
+            except ValueError:
+                print("Uso: /history [N|all]")
+                return
+            if limit < 1:
+                print("O limite deve ser pelo menos 1, ou use 'all'.")
+                return
+
+    try:
+        records = service.conversation(workspace_id, limit=limit)
+    except WorkspaceNotFoundError as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        return
+
+    if not records:
+        print("Nenhuma conversa salva.")
+        return
+
+    print(f"\nHistórico ({len(records)} mensagens):")
+    for record in records:
+        if record.role == "user":
+            print(f"\nVocê: {record.content}")
+            continue
+
+        answer = answer_from_record(record)
+        if answer is not None:
+            _print_answer(answer)
+        else:
+            print(f"\nAgente: {record.content}")
 
 
 # Lista as fontes do workspace dentro do REPL.
