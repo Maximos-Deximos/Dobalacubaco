@@ -150,6 +150,34 @@ class WorkspaceModel(Base):
         back_populates="workspace",
         cascade="all, delete-orphan",
     )
+    chat_messages: Mapped[list[ChatMessageModel]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        order_by="ChatMessageModel.id",
+    )
+
+
+# Mensagem persistida da conversa entre o usuário e o agente.
+class ChatMessageModel(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Dados de exibição da resposta (citações, avisos e modo de busca).
+    extra_metadata: Mapped[dict] = mapped_column(
+        "metadata", JSON, nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+    workspace: Mapped[WorkspaceModel] = relationship(back_populates="chat_messages")
 
 
 # Fonte pública ou arquivo local associado a um workspace.

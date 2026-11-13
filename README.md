@@ -71,6 +71,23 @@ Mantenha `AI_EMBED_PROVIDER=ollama` se quiser que a indexação continue local.
 As variáveis antigas `OLLAMA_MODEL`, `OLLAMA_EMBED_MODEL` e `OLLAMA_TIMEOUT`
 continuam aceitas como valores padrão.
 
+## Histórico de conversa
+
+As perguntas e respostas do chat ficam salvas no banco SQLite local por área de
+trabalho. Ao fechar e abrir a aplicação novamente, a conversa é restaurada:
+
+- na TUI, a aba **Conversa** recarrega as mensagens antigas e usa as últimas
+  trocas como contexto; `Ctrl+L` ou o botão **Limpar** removem a conversa salva
+  após confirmação;
+- no REPL (`chat repl`), o início informa quantas mensagens foram restauradas,
+  `/history [N]` mostra as antigas (`/history all` mostra todas) e `/clear`
+  apaga o histórico;
+- `chat ask` também retoma a conversa anterior e grava a nova pergunta/resposta.
+
+`RAG_HISTORY_TURNS` controla apenas quantas trocas são enviadas ao modelo como
+contexto. O histórico completo permanece salvo até ser limpo ou até a área de
+trabalho ser excluída.
+
 ## Configurar ambiente
 
 - fazer arquivo '.env' na raiz do projeto

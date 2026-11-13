@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -83,6 +83,18 @@ class ChatMessage(BaseModel):
     content: str
 
 
+# Mensagem de conversa persistida no banco.
+class ChatMessageRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    workspace_id: int
+    role: Literal["user", "assistant"]
+    content: str
+    extra_metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
 # Resposta do agente com as fontes utilizadas.
 class ChatAnswer(BaseModel):
     answer: str
@@ -91,6 +103,21 @@ class ChatAnswer(BaseModel):
     model: str = ""
     retrieved_count: int = 0
     warnings: list[str] = Field(default_factory=list)
+
+
+# Reconstrói a resposta exibida a partir de uma mensagem persistida.
+def answer_from_record(record: ChatMessageRecord) -> ChatAnswer | None:
+    if record.role != "assistant":
+        return None
+
+    payload = record.extra_metadata.get("answer")
+    if not isinstance(payload, dict):
+        return None
+
+    try:
+        return ChatAnswer.model_validate(payload)
+    except ValueError:
+        return None
 
 
 # Resultado da indexação de uma fonte ou workspace.

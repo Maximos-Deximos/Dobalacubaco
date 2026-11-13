@@ -11,11 +11,17 @@ from app.ai.promts import (
 from app.ai.provider import AiProvider
 from app.ai.response_parser import parse_chat_answer
 from app.config import Settings, get_settings
+from app.memory.chat_repository import ChatRepository
 from app.memory.chunk_repository import ChunkRepository
 from app.memory.source_repository import SourceRepository
 from app.memory.workspace_repository import WorkspaceRepository
 from app.rag.retriever import Retriever
-from app.schemas.rag import ChatAnswer, ChatMessage, ChatStatus
+from app.schemas.rag import (
+    ChatAnswer,
+    ChatMessage,
+    ChatMessageRecord,
+    ChatStatus,
+)
 from app.schemas.source import SourceStatus
 
 
@@ -35,6 +41,7 @@ class ChatService:
         retriever: Retriever | None = None,
         client: AiProvider | None = None,
         embedder: AiProvider | None = None,
+        chat_repository: ChatRepository | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.workspace_repository = workspace_repository or WorkspaceRepository(
@@ -44,6 +51,9 @@ class ChatService:
             self.settings.database_url
         )
         self.chunk_repository = chunk_repository or ChunkRepository(
+            self.settings.database_url
+        )
+        self.chat_repository = chat_repository or ChatRepository(
             self.settings.database_url
         )
         self.client = client or build_chat_provider(self.settings)
@@ -62,11 +72,16 @@ class ChatService:
         *,
         top_k: int | None = None,
         history: list[ChatMessage] | None = None,
+        persist: bool = True,
     ) -> ChatAnswer:
         if not question.strip():
             raise ChatServiceError("A pergunta não pode estar vazia.")
 
         self.workspace_repository.get(workspace_id)
+        # Sem histórico explícito, retoma a conversa salva neste workspace.
+        if history is None:
+            history = self._load_history(workspace_id)
+
         chunks_total, _embedded = self.chunk_repository.count_by_workspace(
             workspace_id
         )
@@ -101,13 +116,43 @@ class ChatService:
             temperature=self.settings.rag_temperature,
             max_tokens=self.settings.ai_max_tokens,
         )
-        return parse_chat_answer(
+        answer = parse_chat_answer(
             raw_answer,
             hits,
             model=self.settings.ai_model,
             mode=mode,
             warnings=warnings,
         )
+
+        if persist:
+            try:
+                self.chat_repository.append_exchange(
+                    workspace_id,
+                    question=question.strip(),
+                    answer=answer.answer,
+                    answer_metadata={"answer": answer.model_dump(mode="json")},
+                )
+            except Exception as exc:  # noqa: BLE001
+                answer.warnings.append(
+                    f"Não foi possível salvar a conversa no histórico: {exc}"
+                )
+
+        return answer
+
+    # Lista a conversa persistida do workspace em ordem cronológica.
+    def conversation(
+        self,
+        workspace_id: int,
+        *,
+        limit: int | None = None,
+    ) -> list[ChatMessageRecord]:
+        self.workspace_repository.get(workspace_id)
+        return self.chat_repository.list_by_workspace(workspace_id, limit=limit)
+
+    # Remove a conversa persistida do workspace.
+    def clear_conversation(self, workspace_id: int) -> int:
+        self.workspace_repository.get(workspace_id)
+        return self.chat_repository.clear(workspace_id)
 
     # Devolve a situação atual da indexação do workspace.
     def status(self, workspace_id: int) -> ChatStatus:
@@ -126,6 +171,18 @@ class ChatService:
             chunks_embedded=chunks_embedded,
             embedding_model=self.settings.ai_embed_model or None,
         )
+
+    # Carrega do banco apenas as mensagens usadas como contexto do modelo.
+    def _load_history(self, workspace_id: int) -> list[ChatMessage]:
+        limit = self.settings.rag_history_turns * 2
+        if limit <= 0:
+            return []
+
+        records = self.chat_repository.list_by_workspace(workspace_id, limit=limit)
+        return [
+            ChatMessage(role=record.role, content=record.content)
+            for record in records
+        ]
 
     # Limita o histórico enviado ao modelo.
     def _trim_history(

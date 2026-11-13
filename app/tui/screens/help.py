@@ -25,7 +25,7 @@ TUI_HELP = """
 - `f`: adiciona um arquivo PDF ou HTML local.
 - `i`: indexa as fontes da área de trabalho.
 - `r`: atualiza a tela atual.
-- `Ctrl+L`: limpa a conversa.
+- `Ctrl+L`: limpa a conversa salva, com confirmação.
 - `w`: abre a lista de áreas de trabalho.
 - `p`: abre a lista global de propostas.
 - `t`: abre as ferramentas de diagnóstico e inspeção.
@@ -39,6 +39,9 @@ TUI_HELP = """
 3. Indexe as fontes.
 4. Converse com o agente na aba de conversa.
 5. Crie e consulte a proposta de solução.
+
+As perguntas e respostas ficam salvas por área de trabalho e são restauradas
+na próxima vez que a aplicação for aberta.
 """
 
 

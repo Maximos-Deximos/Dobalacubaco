@@ -153,13 +153,18 @@ HELP_ENTRIES: tuple[CommandHelp, ...] = (
     ),
     CommandHelp(
         name="chat ask",
-        summary="faz uma pergunta à área de trabalho, usando fontes quando disponíveis",
+        summary=(
+            "faz uma pergunta, retoma a conversa salva e grava a nova troca"
+        ),
         usage="chat ask PERGUNTA --workspace ID [--top-k N] [--json]",
         category="Chat",
     ),
     CommandHelp(
         name="chat repl",
-        summary="inicia uma conversa interativa, usando fontes quando disponíveis",
+        summary=(
+            "inicia uma conversa interativa com histórico persistente; "
+            "use /history [N] e /clear no prompt"
+        ),
         usage="chat repl --workspace ID [--top-k N]",
         category="Chat",
     ),

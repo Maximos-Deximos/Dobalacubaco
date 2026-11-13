@@ -8,6 +8,7 @@ from textual.widgets import DataTable, Input, TabbedContent
 from app.application.diagnostics_service import DiagnosticCheck
 from app.application.proposal_service import ProposalService
 from app.application.workspace_service import WorkspaceService
+from app.memory.chat_repository import ChatRepository
 from app.memory.database import init_db
 from app.schemas.form import DetectionResult, PageSnapshot
 from app.schemas.rag import ChatAnswer
@@ -359,6 +360,67 @@ async def test_tui_chat_sends_question(
         assert len(chat.history) == 2
         assert chat.history[0].content == "Qual é o prazo?"
         assert chat.history[1].content == "Resposta simulada"
+
+
+# Restaura a conversa salva ao abrir a aba de chat.
+@pytest.mark.asyncio
+async def test_tui_restores_saved_conversation(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    answer = ChatAnswer(answer="Resposta antiga", model="modelo-teste")
+    ChatRepository().append_exchange(
+        workspace_id,
+        question="Pergunta antiga",
+        answer=answer.answer,
+        answer_metadata={"answer": answer.model_dump(mode="json")},
+    )
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-chat"
+        await pilot.pause()
+
+        chat = app.screen.query_one(ChatPane)
+        assert [message.content for message in chat.history] == [
+            "Pergunta antiga",
+            "Resposta antiga",
+        ]
+        assert len(app.services.chat.conversation(workspace_id)) == 2
+
+
+# Limpa a conversa salva após confirmação.
+@pytest.mark.asyncio
+async def test_tui_clears_saved_conversation(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    answer = ChatAnswer(answer="Resposta antiga", model="modelo-teste")
+    ChatRepository().append_exchange(
+        workspace_id,
+        question="Pergunta antiga",
+        answer=answer.answer,
+        answer_metadata={"answer": answer.model_dump(mode="json")},
+    )
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-chat"
+        await pilot.pause()
+
+        chat = app.screen.query_one(ChatPane)
+        await pilot.click("#chat-clear", offset=(1, 1))
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        assert chat.history == []
+        assert app.services.chat.conversation(workspace_id) == []
 
 
 # Executa o diagnóstico com verificações simuladas.
