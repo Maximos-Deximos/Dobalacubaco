@@ -1,11 +1,13 @@
 # Dobalacubaco
-Projeto hackathon
 
-todo: adicionar objetivo/resumo do projeto
+Coopiloto de I.A que auxilia no desenvolvimento de propostas para editais
 
 # Objetivo
 
-todo: add objetivo
+Auxiliar no processo cansativos que é responder a editais
+O agente funciona a partir de fontes anexadas para garantir integridade das respostas
+Usando em base todos os conteudos anexados pelos editais, o agente auxilia com sugestões e revisões 
+de Editais.
 
 # Requisitos
 
@@ -15,7 +17,7 @@ todo: add objetivo
 
 # Instalação
 
-git clone (https://github.com/Maximos-Deximos/projeto)
+git clone https://Maximos-Deximos/Dobalacubaco
 
 ## Configuração do Ollama (padrão local)
 
@@ -126,7 +128,7 @@ PS C:\> <venv>\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## Usagem
+# Usagem
 
 - Rodar `python3 -m app.main` no ambiente virtual para o TUI
 
@@ -186,4 +188,3 @@ pip install -r requirements.txt
 |                    USUÁRIO                       |
 +--------------------------------------------------+
 ```
-todo: NOME!
