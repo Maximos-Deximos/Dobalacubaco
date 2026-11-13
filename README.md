@@ -19,7 +19,12 @@ git clone (https://github.com/Maximos-Deximos/projeto)
 
 ## Ollama Setup
 
-Install module qwen3.5:4b
+- Install module qwen3.5:4b
+
+## Configure enviroment
+
+- make a '.env' file at the root of the directory
+- Populate '.env' with '.env.example'
 
 ## Configure virtual enviroment
 cd local/do/projeto
