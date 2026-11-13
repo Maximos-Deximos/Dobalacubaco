@@ -19,8 +19,9 @@ from app.tui.screens.profile import ProfileEditScreen, ProfileScreen
 from app.tui.screens.proposals import ProposalScreen, ProposalsScreen
 from app.tui.screens.sources import SourcesPane
 from app.tui.screens.tools import ToolsScreen
-from app.tui.screens.workspaces import WorkspaceScreen
+from app.tui.screens.workspaces import WorkspaceScreen, WorkspacesScreen
 from app.tui.services import build_services
+from app.tui.widgets.modals import ConfirmModal
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ingestion"
 
@@ -56,6 +57,69 @@ async def test_tui_home_lists_workspaces(isolated_database: str) -> None:
         stats = app.screen.query_one("#home-stats")
         assert "Áreas de trabalho: 1" in str(stats.content)
         assert "Propostas: 1" in str(stats.content)
+
+
+# Expõe apenas comandos de sistema em português, sem tema ou captura de tela.
+@pytest.mark.asyncio
+async def test_tui_system_commands_are_localized(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        titles = {command.title for command in app.get_system_commands(app.screen)}
+
+    assert "Sair" in titles
+    assert "Theme" not in titles
+    assert "Maximize" not in titles
+    assert "Minimize" not in titles
+    assert "Screenshot" not in titles
+
+
+# Exclui uma área de trabalho pela lista, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_workspace(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("w")
+        await pilot.pause()
+        assert isinstance(app.screen, WorkspacesScreen)
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        table = app.screen.query_one("#workspaces-table", DataTable)
+        assert table.row_count == 0
+        assert app.services.workspaces.list_all() == []
+
+
+# Exclui uma proposta pela lista global, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_proposal(isolated_database: str) -> None:
+    _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("p")
+        await pilot.pause()
+        assert isinstance(app.screen, ProposalsScreen)
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        table = app.screen.query_one("#proposals-table", DataTable)
+        assert table.row_count == 0
+        assert app.services.proposals.list_all() == []
 
 
 # Abre e fecha a tela de ajuda pelo atalho.

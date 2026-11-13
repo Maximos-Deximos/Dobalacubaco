@@ -1,10 +1,12 @@
 # Testes dos casos de uso de propostas.
 
 import pytest
+from sqlalchemy import func, select
 
 from app.application.proposal_service import ProposalService
 from app.application.workspace_service import WorkspaceService
-from app.memory.database import init_db
+from app.memory.database import init_db, session_scope
+from app.memory.models import ProposalRevisionModel, ProposalSectionModel
 from app.memory.proposal_repository import (
     ProposalNotFoundError,
     ProposalSectionNotFoundError,
@@ -93,3 +95,32 @@ def test_proposal_service_rejects_missing_records(
 
     with pytest.raises(ProposalSectionNotFoundError):
         service.update_section(proposal.id, "inexistente", content="x")
+
+
+# Exclui a proposta, as seções e as revisões sem afetar o workspace.
+def test_proposal_service_deletes_proposal_and_children(
+    isolated_database: str,
+) -> None:
+    init_db(isolated_database)
+    workspace = WorkspaceService().create("Workspace persistente", "")
+    service = ProposalService()
+    proposal = service.create(workspace.id, "Proposta descartável")
+    service.update_section(proposal.id, "resumo", content="Conteúdo")
+
+    deleted = service.delete(proposal.id)
+
+    assert deleted.id == proposal.id
+    assert service.list_all() == []
+    assert WorkspaceService().get(workspace.id).id == workspace.id
+    with pytest.raises(ProposalNotFoundError):
+        service.get(proposal.id)
+
+    with session_scope(isolated_database) as session:
+        sections = session.scalar(
+            select(func.count()).select_from(ProposalSectionModel)
+        )
+        revisions = session.scalar(
+            select(func.count()).select_from(ProposalRevisionModel)
+        )
+    assert sections == 0
+    assert revisions == 0

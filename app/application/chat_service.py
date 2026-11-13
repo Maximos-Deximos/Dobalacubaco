@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from app.ai.ollama_client import OllamaClient
-from app.ai.promts import INSUFFICIENT_EVIDENCE, build_chat_messages
+from app.ai.promts import (
+    NO_INDEXED_SOURCES_WARNING,
+    NO_RELEVANT_EXCERPTS_WARNING,
+    build_chat_messages,
+)
 from app.ai.response_parser import parse_chat_answer
 from app.config import Settings, get_settings
 from app.memory.chunk_repository import ChunkRepository
@@ -50,7 +54,7 @@ class ChatService:
             embedder=self.client,
         )
 
-    # Responde uma pergunta usando apenas os trechos indexados do workspace.
+    # Responde usando os trechos indexados quando disponíveis, com fallback geral.
     def ask(
         self,
         workspace_id: int,
@@ -63,25 +67,31 @@ class ChatService:
             raise ChatServiceError("A pergunta não pode estar vazia.")
 
         self.workspace_repository.get(workspace_id)
-        retrieval = self.retriever.retrieve(
-            workspace_id,
-            question,
-            top_k=top_k,
+        chunks_total, _embedded = self.chunk_repository.count_by_workspace(
+            workspace_id
         )
+        hits = []
+        warnings: list[str] = []
+        mode = None
 
-        if not retrieval.hits:
-            return ChatAnswer(
-                answer=INSUFFICIENT_EVIDENCE,
-                mode=retrieval.mode,
-                model=self.settings.ollama_model,
-                retrieved_count=0,
-                warnings=retrieval.warnings,
+        if chunks_total:
+            retrieval = self.retriever.retrieve(
+                workspace_id,
+                question,
+                top_k=top_k,
             )
+            hits = retrieval.hits
+            warnings = list(retrieval.warnings)
+            mode = retrieval.mode
+            if not hits:
+                warnings.append(NO_RELEVANT_EXCERPTS_WARNING)
+        else:
+            warnings.append(NO_INDEXED_SOURCES_WARNING)
 
         trimmed_history = self._trim_history(history)
         messages = build_chat_messages(
             question,
-            retrieval.hits,
+            hits,
             max_context_chars=self.settings.rag_max_context_chars,
             history=trimmed_history,
         )
@@ -92,10 +102,10 @@ class ChatService:
         )
         return parse_chat_answer(
             raw_answer,
-            retrieval.hits,
+            hits,
             model=self.settings.ollama_model,
-            mode=retrieval.mode,
-            warnings=retrieval.warnings,
+            mode=mode,
+            warnings=warnings,
         )
 
     # Devolve a situação atual da indexação do workspace.

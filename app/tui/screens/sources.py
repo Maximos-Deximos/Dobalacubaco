@@ -11,7 +11,7 @@ from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Footer, Header, Static
 
-from app.schemas.source import Source, SourceDetail
+from app.schemas.source import Source, SourceDetail, SourceKind
 from app.tui.labels import (
     SOURCE_KIND_LABELS,
     SOURCE_STATUS_LABELS,
@@ -275,12 +275,14 @@ class SourceDetailScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("escape", "back", "Voltar"),
         ("r", "reload", "Atualizar"),
+        ("p", "pdf_form", "Preencher PDF"),
     ]
 
     def __init__(self, services: TuiServices, source_id: int) -> None:
         super().__init__()
         self.services = services
         self.source_id = source_id
+        self.detail: SourceDetail | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -293,6 +295,12 @@ class SourceDetailScreen(Screen):
             with Horizontal(classes="actions"):
                 yield Button("Voltar", id="back")
                 yield Button("Atualizar", id="refresh")
+                yield Button(
+                    "Preencher PDF",
+                    id="pdf-form",
+                    variant="primary",
+                    disabled=True,
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -305,6 +313,7 @@ class SourceDetailScreen(Screen):
             self.notify(f"Erro ao carregar fonte: {exc}", severity="error")
             return
 
+        self.detail = detail
         self.query_one("#source-title", Static).update(
             detail.title or f"Fonte {detail.id}"
         )
@@ -318,18 +327,37 @@ class SourceDetailScreen(Screen):
         self.query_one("#source-preview", Static).update(
             f"Prévia do conteúdo:\n\n{preview or '(sem texto extraído)'}"
         )
+        can_fill = bool(
+            detail.source_kind in {SourceKind.WEB_PDF, SourceKind.UPLOADED_PDF}
+            and detail.snapshot is not None
+            and detail.snapshot.raw_path
+        )
+        self.query_one("#pdf-form", Button).disabled = not can_fill
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back":
             self.action_back()
         elif event.button.id == "refresh":
             self._load()
+        elif event.button.id == "pdf-form":
+            self.action_pdf_form()
 
     def action_back(self) -> None:
         self.app.pop_screen()
 
     def action_reload(self) -> None:
         self._load()
+
+    def action_pdf_form(self) -> None:
+        if self.detail is None or self.detail.source_kind not in {
+            SourceKind.WEB_PDF,
+            SourceKind.UPLOADED_PDF,
+        }:
+            self.notify("A fonte selecionada não é um PDF.", severity="warning")
+            return
+        from app.tui.screens.pdf_form import PdfFormScreen
+
+        self.app.push_screen(PdfFormScreen(self.services, self.source_id))
 
 
 # Monta os metadados exibidos no detalhe da fonte.

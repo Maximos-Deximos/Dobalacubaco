@@ -24,13 +24,14 @@ from app.tui.screens.chat import ChatPane
 from app.tui.screens.proposals import ProposalsPane
 from app.tui.screens.sources import SourcesPane
 from app.tui.services import TuiServices
-from app.tui.widgets.modals import WorkspaceCreateModal
+from app.tui.widgets.modals import ConfirmModal, WorkspaceCreateModal
 
 
 # Lista completa de áreas de trabalho.
 class WorkspacesScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("n", "new_workspace", "Nova"),
+        ("d", "delete_workspace", "Excluir"),
         ("r", "refresh", "Atualizar"),
         ("escape", "back", "Voltar"),
     ]
@@ -39,6 +40,7 @@ class WorkspacesScreen(Screen):
         super().__init__()
         self.services = services
         self._table_ready = False
+        self._pending_delete_id: int | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -48,6 +50,7 @@ class WorkspacesScreen(Screen):
             with Horizontal(classes="actions"):
                 yield Button("Nova área", id="new", variant="primary")
                 yield Button("Abrir", id="open")
+                yield Button("Excluir", id="delete", variant="error")
                 yield Button("Atualizar", id="refresh")
                 yield Button("Voltar", id="back")
         yield Footer()
@@ -93,6 +96,49 @@ class WorkspacesScreen(Screen):
             return
         self.app.push_screen(WorkspaceScreen(self.services, workspace_id))
 
+    def action_delete_workspace(self) -> None:
+        workspace_id = self._selected_workspace_id()
+        if workspace_id is None:
+            self.notify("Selecione uma área de trabalho.", severity="warning")
+            return
+
+        try:
+            workspace = self.services.workspaces.get(workspace_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao carregar área de trabalho: {exc}", severity="error")
+            return
+
+        self._pending_delete_id = workspace_id
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    f"Excluir a área de trabalho '{workspace.name}'? "
+                    "Fontes, propostas, conversas e sessões PDF vinculadas "
+                    "também serão removidas. Esta ação não pode ser desfeita."
+                ),
+                title="Excluir área de trabalho",
+            ),
+            self._after_delete,
+        )
+
+    async def _after_delete(self, confirmed: object) -> None:
+        workspace_id = self._pending_delete_id
+        self._pending_delete_id = None
+        if confirmed is not True or workspace_id is None:
+            return
+
+        try:
+            workspace = self.services.workspaces.delete(workspace_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao excluir área de trabalho: {exc}", severity="error")
+            return
+
+        self._load()
+        self.notify(
+            f"Área de trabalho '{workspace.name}' excluída.",
+            severity="information",
+        )
+
     def action_new_workspace(self) -> None:
         self.app.push_screen(WorkspaceCreateModal(), self._after_create)
 
@@ -118,6 +164,8 @@ class WorkspacesScreen(Screen):
                 self.action_new_workspace()
             case "open":
                 self._open_selected()
+            case "delete":
+                self.action_delete_workspace()
             case "refresh":
                 self._load()
             case "back":

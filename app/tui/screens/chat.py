@@ -61,7 +61,8 @@ class ChatPane(Widget):
         self._refresh_status()
         self._write(
             "Agente de Editais",
-            "Pergunte sobre o edital e as fontes indexadas desta área de trabalho.",
+            "Pergunte sobre o edital ou peça sugestões. As fontes indexadas "
+            "serão usadas quando estiverem disponíveis.",
         )
 
     # Atualiza o cabeçalho com a situação do índice.

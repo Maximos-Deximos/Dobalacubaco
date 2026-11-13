@@ -36,6 +36,9 @@ def test_initial_migration_creates_tables(tmp_path, monkeypatch) -> None:
         "proposals",
         "proposal_sections",
         "proposal_revisions",
+        "pdf_fill_sessions",
+        "pdf_fill_fields",
+        "pdf_field_memories",
     } <= tables
 
     reset_engine()

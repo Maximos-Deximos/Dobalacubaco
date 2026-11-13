@@ -8,10 +8,12 @@ from app.application.chat_service import ChatService
 from app.application.diagnostics_service import DiagnosticsService
 from app.application.indexing_service import IndexingService
 from app.application.inspection_service import InspectionService
+from app.application.pdf_form_service import PdfFormService
 from app.application.proposal_service import ProposalService
 from app.application.source_service import SourceIngestionService
 from app.application.workspace_service import WorkspaceService
 from app.config import Settings, get_settings
+from app.ingestion.storage import SourceStorage
 from app.memory.user_repository import UserRepository
 
 
@@ -26,6 +28,7 @@ class TuiServices:
     users: UserRepository
     diagnostics: DiagnosticsService
     inspection: InspectionService
+    pdf_forms: PdfFormService
 
 
 # Monta os serviços reais a partir das configurações locais.
@@ -33,7 +36,7 @@ def build_services(settings: Settings | None = None) -> TuiServices:
     settings = settings or get_settings()
     return TuiServices(
         settings=settings,
-        workspaces=WorkspaceService(),
+        workspaces=WorkspaceService(storage=SourceStorage(settings)),
         sources=SourceIngestionService(settings),
         indexing=IndexingService(settings),
         chat=ChatService(settings),
@@ -41,4 +44,5 @@ def build_services(settings: Settings | None = None) -> TuiServices:
         users=UserRepository(settings.database_url),
         diagnostics=DiagnosticsService(settings),
         inspection=InspectionService(settings),
+        pdf_forms=PdfFormService(settings),
     )

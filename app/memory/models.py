@@ -358,3 +358,136 @@ class ProposalRevisionModel(Base):
     )
 
     proposal: Mapped[ProposalModel] = relationship(back_populates="revisions")
+
+
+# Sessão persistida de preenchimento de um formulário PDF.
+class PdfFillSessionModel(Base):
+    __tablename__ = "pdf_fill_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft", index=True
+    )
+    generation_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="idle"
+    )
+    generation_progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    generation_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_path: Mapped[str | None] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+    last_suggested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    fields: Mapped[list[PdfFillFieldModel]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="PdfFillFieldModel.id",
+    )
+
+
+# Campo individual de uma sessão de preenchimento de PDF.
+class PdfFillFieldModel(Base):
+    __tablename__ = "pdf_fill_fields"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "field_name",
+            name="uq_pdf_fill_fields_session_field",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("pdf_fill_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    field_name: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    field_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="unknown"
+    )
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    readonly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    options: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    current_value: Mapped[str | None] = mapped_column(Text)
+    suggested_value: Mapped[str | None] = mapped_column(Text)
+    final_value: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    suggestion_source: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="pending", index=True
+    )
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    max_length: Mapped[int | None] = mapped_column(Integer)
+    warnings: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    session: Mapped[PdfFillSessionModel] = relationship(back_populates="fields")
+
+
+# Memória vetorial de valores de campos já revisados e aprovados.
+class PdfFieldMemoryModel(Base):
+    __tablename__ = "pdf_field_memories"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "memory_hash",
+            name="uq_pdf_field_memories_workspace_hash",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sources.id", ondelete="SET NULL"),
+        index=True,
+    )
+    memory_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    field_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    field_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="unknown"
+    )
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(JSON)
+    embedding_model: Mapped[str | None] = mapped_column(String(120))
+    embedding_dim: Mapped[int | None] = mapped_column(Integer)
+    usage_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )

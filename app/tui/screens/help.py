@@ -20,6 +20,7 @@ TUI_HELP = """
 - `Esc`: volta para a tela anterior.
 - `Enter`: abre o item selecionado.
 - `n`: cria um novo item no contexto atual.
+- `d`: exclui o item selecionado, com confirmação.
 - `a`: adiciona uma fonte por URL.
 - `f`: adiciona um arquivo PDF ou HTML local.
 - `i`: indexa as fontes da área de trabalho.
