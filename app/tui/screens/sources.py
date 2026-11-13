@@ -18,7 +18,7 @@ from app.tui.labels import (
     label_for,
 )
 from app.tui.services import TuiServices
-from app.tui.widgets.modals import SourceFileModal, SourceUrlModal
+from app.tui.widgets.modals import ConfirmModal, SourceFileModal, SourceUrlModal
 from app.tui.workers import run_blocking
 
 
@@ -33,6 +33,7 @@ class SourcesPane(Widget):
         ("a", "new_url", "Adicionar URL"),
         ("f", "new_file", "Adicionar arquivo"),
         ("i", "index", "Indexar"),
+        ("d", "delete", "Excluir"),
         ("r", "refresh", "Atualizar"),
     ]
 
@@ -48,6 +49,7 @@ class SourcesPane(Widget):
         self.workspace_name = workspace_name
         self._table_ready = False
         self._busy = False
+        self._pending_delete_id: int | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="pane-body"):
@@ -63,6 +65,7 @@ class SourcesPane(Widget):
                 yield Button("Adicionar arquivo", id="add-file")
                 yield Button("Indexar selecionada", id="index-one")
                 yield Button("Indexar todas", id="index-all")
+                yield Button("Excluir", id="delete-source", variant="error")
                 yield Button("Atualizar", id="refresh")
 
     def on_mount(self) -> None:
@@ -113,6 +116,7 @@ class SourcesPane(Widget):
             "#add-file",
             "#index-one",
             "#index-all",
+            "#delete-source",
             "#refresh",
         ):
             self.query_one(button_id, Button).disabled = busy
@@ -239,12 +243,67 @@ class SourcesPane(Widget):
         self._status(message)
         self.notify(message, severity="information")
 
+    # Abre a confirmação de exclusão da fonte selecionada.
+    def action_delete(self) -> None:
+        if self._busy:
+            return
+        source_id = self._selected_source_id()
+        if source_id is None:
+            self.notify("Selecione uma fonte para excluir.", severity="warning")
+            return
+
+        try:
+            detail = self.services.sources.get_source(source_id)
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Erro ao carregar fonte: {exc}", severity="error")
+            return
+
+        self._pending_delete_id = source_id
+        self.app.push_screen(
+            ConfirmModal(
+                (
+                    f"Excluir a fonte '{detail.title or detail.id}'? "
+                    "O snapshot, os trechos indexados, os arquivos locais e "
+                    "os PDFs vinculados também serão removidos. "
+                    "Esta ação não pode ser desfeita."
+                ),
+                title="Excluir fonte",
+            ),
+            self._after_delete,
+        )
+
+    async def _after_delete(self, confirmed: object) -> None:
+        source_id = self._pending_delete_id
+        self._pending_delete_id = None
+        if confirmed is not True or source_id is None:
+            return
+
+        self._set_busy(True, "Excluindo fonte...")
+        try:
+            deleted = await run_blocking(
+                self,
+                self.services.sources.delete_source,
+                source_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._set_busy(False)
+            self._status(f"Erro ao excluir fonte: {exc}", error=True)
+            return
+
+        self._set_busy(False)
+        self._load()
+        message = f"Fonte '{deleted.title or deleted.id}' excluída."
+        self._status(message)
+        self.notify(message, severity="information")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "add-url":
                 self.action_new_url()
             case "add-file":
                 self.action_new_file()
+            case "delete-source":
+                self.action_delete()
             case "index-one":
                 source_id = self._selected_source_id()
                 if source_id is None:

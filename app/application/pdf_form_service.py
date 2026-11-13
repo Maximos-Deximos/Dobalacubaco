@@ -6,12 +6,13 @@ from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from app.ai.ollama_client import OllamaClient, OllamaError
+from app.ai.factory import build_chat_provider, build_embed_provider
 from app.ai.promts import (
     NO_INDEXED_SOURCES_WARNING,
     NO_RELEVANT_EXCERPTS_WARNING,
     build_pdf_suggestion_messages,
 )
+from app.ai.provider import AiError, AiProvider
 from app.ai.response_parser import PdfSuggestionParseError, parse_pdf_suggestions
 from app.config import Settings, get_settings
 from app.ingestion.pdf_form import PdfFormError, PdfFormFiller, PdfFormInspector
@@ -81,7 +82,8 @@ class PdfFormService:
         user_repository: UserRepository | None = None,
         chunk_repository: ChunkRepository | None = None,
         retriever: Retriever | None = None,
-        client: OllamaClient | None = None,
+        client: AiProvider | None = None,
+        embedder: AiProvider | None = None,
         memory_index: PdfMemoryIndex | None = None,
         inspector: PdfFormInspector | None = None,
         filler: PdfFormFiller | None = None,
@@ -102,14 +104,12 @@ class PdfFormService:
         self.chunk_repository = chunk_repository or ChunkRepository(
             self.settings.database_url
         )
-        self.client = client or OllamaClient(
-            host=self.settings.ollama_host,
-            timeout=self.settings.ollama_timeout,
-        )
+        self.client = client or build_chat_provider(self.settings)
+        self.embedder = embedder or build_embed_provider(self.settings)
         self.retriever = retriever or Retriever(
             settings=self.settings,
             chunk_repository=self.chunk_repository,
-            embedder=self.client,
+            embedder=self.embedder,
         )
         self.memory_index = memory_index or PdfMemoryIndex(
             settings=self.settings,
@@ -288,13 +288,14 @@ class PdfFormService:
                     max_context_chars=self.settings.rag_max_context_chars,
                 )
                 raw = self.client.chat(
-                    self.settings.ollama_model,
+                    self.settings.ai_model,
                     messages,
                     temperature=self.settings.rag_temperature,
+                    max_tokens=self.settings.ai_max_tokens,
                 )
                 suggestions, parse_warnings = parse_pdf_suggestions(raw, batch)
                 warnings.extend(parse_warnings)
-            except (OllamaError, PdfSuggestionParseError) as exc:
+            except (AiError, PdfSuggestionParseError) as exc:
                 warnings.append(f"Falha ao gerar sugestões com a IA: {exc}")
                 break
             except Exception as exc:  # noqa: BLE001
@@ -612,8 +613,8 @@ class PdfFormService:
         instructions: str,
     ) -> tuple[list[dict], list[str]]:
         warnings: list[str] = []
-        model = self.settings.ollama_embed_model
-        if not model:
+        model = self.settings.ai_embed_model
+        if not model or self.embedder is None:
             return [], ["Modelo de embedding não configurado; memória vetorial ignorada."]
 
         candidates = [
@@ -627,8 +628,8 @@ class PdfFormService:
 
         texts = [self._field_query(field, instructions) for field in candidates]
         try:
-            embeddings = self.client.embed(model, texts)
-        except OllamaError as exc:
+            embeddings = self.embedder.embed(model, texts)
+        except AiError as exc:
             return [], [f"Memória vetorial indisponível: {exc}"]
 
         matches = self.memory_index.similar_many(
@@ -678,11 +679,11 @@ class PdfFormService:
             field.field_name: [] for field in fields
         }
 
-        model = self.settings.ollama_embed_model
-        if model:
+        model = self.settings.ai_embed_model
+        if model and self.embedder is not None:
             texts = [self._field_query(field, instructions) for field in fields]
             try:
-                embeddings = self.client.embed(model, texts)
+                embeddings = self.embedder.embed(model, texts)
                 matches = self.memory_index.similar_many(
                     workspace_id,
                     embeddings,
@@ -696,7 +697,7 @@ class PdfFormService:
                         for match in field_matches
                         if self._memory_compatible(field, match.item)
                     ]
-            except OllamaError as exc:
+            except AiError as exc:
                 warnings.append(f"Memória vetorial indisponível: {exc}")
 
         chunks_total, _ = self.chunk_repository.count_by_workspace(workspace_id)
@@ -770,13 +771,13 @@ class PdfFormService:
         fields: list[PdfFieldRecord],
     ) -> list[str]:
         warnings: list[str] = []
-        model = self.settings.ollama_embed_model
+        model = self.settings.ai_embed_model
         texts = [self._memory_text(field, field.final_value or "") for field in fields]
         embeddings: list[list[float] | None] = [None] * len(fields)
 
-        if model and texts:
+        if model and texts and self.embedder is not None:
             try:
-                generated = self.client.embed(model, texts)
+                generated = self.embedder.embed(model, texts)
                 if len(generated) == len(texts):
                     embeddings = list(generated)
                 else:
@@ -784,7 +785,7 @@ class PdfFormService:
                         "A quantidade de embeddings de memória foi inválida; "
                         "valores salvos sem vetor."
                     )
-            except OllamaError as exc:
+            except AiError as exc:
                 warnings.append(
                     f"Falha ao gerar embeddings da memória; valores salvos sem vetor. {exc}"
                 )

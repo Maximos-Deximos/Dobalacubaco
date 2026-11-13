@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from app.ai.ollama_client import OllamaError
+from app.ai.provider import AiError
 from app.application.chat_service import ChatService, ChatServiceError
 from app.memory.database import init_db
 from app.memory.workspace_repository import WorkspaceNotFoundError
@@ -23,7 +23,7 @@ def command_chat_ask(args: argparse.Namespace) -> int:
             args.question,
             top_k=args.top_k,
         )
-    except (WorkspaceNotFoundError, ChatServiceError, OllamaError, ValueError) as exc:
+    except (WorkspaceNotFoundError, ChatServiceError, AiError, ValueError) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
 
@@ -107,7 +107,7 @@ def command_chat_repl(args: argparse.Namespace) -> int:
                 top_k=args.top_k,
                 history=history,
             )
-        except (ChatServiceError, OllamaError, ValueError) as exc:
+        except (ChatServiceError, AiError, ValueError) as exc:
             print(f"Erro: {exc}", file=sys.stderr)
             continue
 

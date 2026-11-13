@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.ai.factory import build_chat_provider, build_embed_provider
 from app.application.chat_service import ChatService
 from app.application.diagnostics_service import DiagnosticsService
 from app.application.indexing_service import IndexingService
@@ -34,15 +35,28 @@ class TuiServices:
 # Monta os serviços reais a partir das configurações locais.
 def build_services(settings: Settings | None = None) -> TuiServices:
     settings = settings or get_settings()
+
+    # Um único cliente de chat e um único embedder são compartilhados.
+    chat_provider = build_chat_provider(settings)
+    embed_provider = build_embed_provider(settings)
+
     return TuiServices(
         settings=settings,
         workspaces=WorkspaceService(storage=SourceStorage(settings)),
         sources=SourceIngestionService(settings),
-        indexing=IndexingService(settings),
-        chat=ChatService(settings),
+        indexing=IndexingService(settings, embedder=embed_provider),
+        chat=ChatService(
+            settings,
+            client=chat_provider,
+            embedder=embed_provider,
+        ),
         proposals=ProposalService(),
         users=UserRepository(settings.database_url),
         diagnostics=DiagnosticsService(settings),
         inspection=InspectionService(settings),
-        pdf_forms=PdfFormService(settings),
+        pdf_forms=PdfFormService(
+            settings,
+            client=chat_provider,
+            embedder=embed_provider,
+        ),
     )

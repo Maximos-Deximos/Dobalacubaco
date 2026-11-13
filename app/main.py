@@ -696,7 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser(
         "doctor",
-        help="verifica configuração, banco, Ollama e Playwright",
+        help="verifica configuração, banco, provedor de IA e Playwright",
     )
     doctor.set_defaults(func=command_doctor)
 

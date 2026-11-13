@@ -71,7 +71,7 @@ class DoctorPane(Widget):
     def compose(self) -> ComposeResult:
         with Vertical(classes="pane-body"):
             yield Static(
-                "Verifica configuração, banco, Ollama e Playwright.",
+                "Verifica configuração, banco, provedor de IA e Playwright.",
                 classes="hint",
             )
             yield Static("Pronto para executar.", id="doctor-status", classes="hint")

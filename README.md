@@ -9,16 +9,67 @@ todo: add objetivo
 
 # Requisitos
 
-- Olamma
 - Python3
+- Ollama (opcional, usado por padrão para chat e embeddings locais)
+- Uma chave de API, caso queira usar um provedor externo
 
 # Instalação
 
 git clone (https://github.com/Maximos-Deximos/projeto)
 
-## Configuração do Ollama
+## Configuração do Ollama (padrão local)
 
 - Instalar modulo qwen3.5:4b
+
+## Provedores externos de IA
+
+O agente funciona com qualquer um dos provedores abaixo, configurado no `.env`:
+
+| `AI_PROVIDER` | Chat | Embeddings |
+| ------------- | ---- | ---------- |
+| `ollama`      | Sim  | Sim        |
+| `openai`      | Sim  | Sim        |
+| `openrouter`  | Sim  | Não        |
+| `groq`        | Sim  | Não        |
+| `deepseek`    | Sim  | Não        |
+| `anthropic`   | Sim  | Não        |
+| `gemini`      | Sim  | Sim        |
+
+Exemplo com OpenAI:
+
+```env
+AI_PROVIDER=openai
+AI_MODEL=gpt-4o-mini
+AI_API_KEY=sk-...
+# Embeddings continuam locais por padrão
+AI_EMBED_PROVIDER=ollama
+AI_EMBED_MODEL=bge-m3
+```
+
+Exemplo com Anthropic (o provedor não oferece embeddings):
+
+```env
+AI_PROVIDER=anthropic
+AI_MODEL=claude-3-5-haiku-latest
+AI_API_KEY=sk-ant-...
+AI_EMBED_PROVIDER=ollama
+```
+
+Para desativar a busca semântica e usar apenas a busca lexical:
+
+```env
+AI_EMBED_PROVIDER=none
+```
+
+As chaves específicas de cada provedor também são aceitas:
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY` e `GOOGLE_API_KEY`.
+
+Ao usar um provedor externo, os trechos enviados ao modelo saem da máquina.
+Mantenha `AI_EMBED_PROVIDER=ollama` se quiser que a indexação continue local.
+
+As variáveis antigas `OLLAMA_MODEL`, `OLLAMA_EMBED_MODEL` e `OLLAMA_TIMEOUT`
+continuam aceitas como valores padrão.
 
 ## Configurar ambiente
 

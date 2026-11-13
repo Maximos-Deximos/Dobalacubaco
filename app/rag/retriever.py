@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from app.ai.ollama_client import OllamaClient, OllamaError
+from app.ai.provider import AiError, AiProvider
 from app.config import Settings, get_settings
 from app.memory.chunk_repository import ChunkRepository
 from app.rag.vector_index import VectorIndex
@@ -27,7 +27,7 @@ class Retriever:
         self,
         settings: Settings | None = None,
         chunk_repository: ChunkRepository | None = None,
-        embedder: OllamaClient | None = None,
+        embedder: AiProvider | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.chunk_repository = chunk_repository or ChunkRepository(
@@ -51,7 +51,7 @@ class Retriever:
             raise ValueError("A quantidade de trechos deve ser pelo menos 1.")
 
         warnings: list[str] = []
-        if self.embedder is not None and self.settings.ollama_embed_model:
+        if self.embedder is not None and self.settings.ai_embed_model:
             semantic = self._semantic_search(
                 workspace_id,
                 query,
@@ -89,13 +89,13 @@ class Retriever:
 
         cleaned = [query.strip() for query in queries]
         warnings: list[str] = []
-        model = self.settings.ollama_embed_model
+        model = self.settings.ai_embed_model
         semantic: list[list[RetrievalHit]] | None = None
 
         if self.embedder is not None and model:
             try:
                 embeddings = self.embedder.embed(model, cleaned)
-            except OllamaError as exc:
+            except AiError as exc:
                 warnings.append(
                     f"Busca semântica indisponível; usando busca lexical. {exc}"
                 )
@@ -172,12 +172,12 @@ class Retriever:
         limit: int,
         warnings: list[str],
     ) -> list[RetrievalHit]:
-        model = self.settings.ollama_embed_model
+        model = self.settings.ai_embed_model
         assert self.embedder is not None
 
         try:
             query_embedding = self.embedder.embed(model, [query])[0]
-        except OllamaError as exc:
+        except AiError as exc:
             warnings.append(
                 f"Busca semântica indisponível; usando busca lexical. {exc}"
             )

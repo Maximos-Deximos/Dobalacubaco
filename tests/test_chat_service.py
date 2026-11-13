@@ -27,7 +27,14 @@ class FakeChatClient:
         self.messages = []
         self.calls = 0
 
-    def chat(self, model: str, messages, *, temperature: float = 0.1) -> str:
+    def chat(
+        self,
+        model: str,
+        messages,
+        *,
+        temperature: float = 0.1,
+        max_tokens: int | None = None,
+    ) -> str:
         self.calls += 1
         self.messages = messages
         return self.answer
@@ -92,7 +99,7 @@ def test_ask_returns_answer_with_citation(isolated_database) -> None:
 
     assert answer.answer == "O prazo é de 30 dias [F1]."
     assert answer.mode == RetrievalMode.LEXICAL
-    assert answer.model == get_settings().ollama_model
+    assert answer.model == get_settings().ai_model
     assert answer.retrieved_count == 1
     assert answer.citations
     assert answer.citations[0].marker == "F1"

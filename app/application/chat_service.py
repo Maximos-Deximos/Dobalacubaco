@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from app.ai.ollama_client import OllamaClient
+from app.ai.factory import build_chat_provider, build_embed_provider
 from app.ai.promts import (
     NO_INDEXED_SOURCES_WARNING,
     NO_RELEVANT_EXCERPTS_WARNING,
     build_chat_messages,
 )
+from app.ai.provider import AiProvider
 from app.ai.response_parser import parse_chat_answer
 from app.config import Settings, get_settings
 from app.memory.chunk_repository import ChunkRepository
@@ -32,7 +33,8 @@ class ChatService:
         source_repository: SourceRepository | None = None,
         chunk_repository: ChunkRepository | None = None,
         retriever: Retriever | None = None,
-        client: OllamaClient | None = None,
+        client: AiProvider | None = None,
+        embedder: AiProvider | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.workspace_repository = workspace_repository or WorkspaceRepository(
@@ -44,14 +46,12 @@ class ChatService:
         self.chunk_repository = chunk_repository or ChunkRepository(
             self.settings.database_url
         )
-        self.client = client or OllamaClient(
-            host=self.settings.ollama_host,
-            timeout=self.settings.ollama_timeout,
-        )
+        self.client = client or build_chat_provider(self.settings)
+        self.embedder = embedder or build_embed_provider(self.settings)
         self.retriever = retriever or Retriever(
             settings=self.settings,
             chunk_repository=self.chunk_repository,
-            embedder=self.client,
+            embedder=self.embedder,
         )
 
     # Responde usando os trechos indexados quando disponíveis, com fallback geral.
@@ -96,14 +96,15 @@ class ChatService:
             history=trimmed_history,
         )
         raw_answer = self.client.chat(
-            self.settings.ollama_model,
+            self.settings.ai_model,
             messages,
             temperature=self.settings.rag_temperature,
+            max_tokens=self.settings.ai_max_tokens,
         )
         return parse_chat_answer(
             raw_answer,
             hits,
-            model=self.settings.ollama_model,
+            model=self.settings.ai_model,
             mode=mode,
             warnings=warnings,
         )
@@ -123,7 +124,7 @@ class ChatService:
             ),
             chunks_total=chunks_total,
             chunks_embedded=chunks_embedded,
-            embedding_model=self.settings.ollama_embed_model,
+            embedding_model=self.settings.ai_embed_model or None,
         )
 
     # Limita o histórico enviado ao modelo.

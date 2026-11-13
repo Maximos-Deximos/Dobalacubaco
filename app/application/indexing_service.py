@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from app.ai.ollama_client import OllamaClient, OllamaError
+from app.ai.factory import build_embed_provider
+from app.ai.provider import AiError, AiProvider
 from app.config import Settings, get_settings
 from app.memory.chunk_repository import ChunkRepository
 from app.memory.source_repository import SourceRepository
@@ -25,7 +26,7 @@ class IndexingService:
         workspace_repository: WorkspaceRepository | None = None,
         source_repository: SourceRepository | None = None,
         chunk_repository: ChunkRepository | None = None,
-        embedder: OllamaClient | None = None,
+        embedder: AiProvider | None = None,
         chunker: Chunker | None = None,
     ) -> None:
         self.settings = settings or get_settings()
@@ -38,10 +39,7 @@ class IndexingService:
         self.chunk_repository = chunk_repository or ChunkRepository(
             self.settings.database_url
         )
-        self.embedder = embedder or OllamaClient(
-            host=self.settings.ollama_host,
-            timeout=self.settings.ollama_timeout,
-        )
+        self.embedder = embedder or build_embed_provider(self.settings)
         self.chunker = chunker or Chunker(
             chunk_chars=self.settings.rag_chunk_chars,
             overlap=self.settings.rag_chunk_overlap,
@@ -58,7 +56,7 @@ class IndexingService:
         self.workspace_repository.get(workspace_id)
         result = IndexResult(
             workspace_id=workspace_id,
-            embedding_model=self.settings.ollama_embed_model,
+            embedding_model=self.settings.ai_embed_model or None,
         )
 
         if source_id is not None:
@@ -100,7 +98,7 @@ class IndexingService:
                 drafts=drafts,
                 embeddings=embeddings,
                 embedding_model=(
-                    self.settings.ollama_embed_model if embeddings else None
+                    self.settings.ai_embed_model if embeddings else None
                 ),
             )
 
@@ -130,7 +128,7 @@ class IndexingService:
 
     # Confere se os trechos existentes já usam o modelo configurado.
     def _is_current(self, chunks) -> bool:
-        model = self.settings.ollama_embed_model
+        model = self.settings.ai_embed_model
         return all(
             chunk.embedding is not None and chunk.embedding_model == model
             for chunk in chunks
@@ -142,8 +140,8 @@ class IndexingService:
         drafts: list[ChunkDraft],
         result: IndexResult,
     ) -> list[list[float]] | None:
-        model = self.settings.ollama_embed_model
-        if not model:
+        model = self.settings.ai_embed_model
+        if not model or self.embedder is None:
             result.warnings.append(
                 "Modelo de embedding não configurado; indexação apenas lexical."
             )
@@ -158,7 +156,7 @@ class IndexingService:
                 embeddings.extend(
                     self.embedder.embed(model, texts[start : start + batch_size])
                 )
-        except OllamaError as exc:
+        except AiError as exc:
             result.warnings.append(
                 f"Falha ao gerar embeddings com '{model}'; mantendo índice "
                 f"lexical. {exc}"

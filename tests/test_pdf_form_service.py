@@ -23,7 +23,11 @@ from tests.pdf_helpers import PDF_FIXTURE, FakePdfClient, create_pdf_source
 def _service(monkeypatch, client: FakePdfClient) -> PdfFormService:
     monkeypatch.setenv("OLLAMA_EMBED_MODEL", "fake")
     get_settings.cache_clear()
-    return PdfFormService(settings=get_settings(), client=client)
+    return PdfFormService(
+        settings=get_settings(),
+        client=client,
+        embedder=client,
+    )
 
 
 # Inspeciona a fonte e reutiliza a sessão aberta.

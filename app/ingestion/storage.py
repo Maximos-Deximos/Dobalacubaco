@@ -51,6 +51,13 @@ class SourceStorage:
     def delete_workspace(self, workspace_id: int) -> None:
         shutil.rmtree(self.workspace_dir(workspace_id), ignore_errors=True)
 
+    # Remove os arquivos locais de uma fonte.
+    def delete_source(self, workspace_id: int, source_id: int) -> None:
+        shutil.rmtree(
+            self.source_dir(workspace_id, source_id),
+            ignore_errors=True,
+        )
+
     # Persiste o original, o texto extraído e os metadados.
     def save(
         self,

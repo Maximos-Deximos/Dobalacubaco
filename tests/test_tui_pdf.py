@@ -69,7 +69,10 @@ async def test_pdf_screen_progressive_suggestions(isolated_database: str) -> Non
     init_db(isolated_database)
     _workspace_id, source = create_pdf_source()
     services = build_services()
-    services.pdf_forms.client = FakePdfClient()
+    fake_client = FakePdfClient()
+    services.pdf_forms.client = fake_client
+    services.pdf_forms.embedder = fake_client
+    services.pdf_forms.retriever.embedder = fake_client
     app = ProposalTuiApp(services)
 
     async with app.run_test(size=(140, 45)) as pilot:
@@ -102,7 +105,10 @@ async def test_pdf_screen_approves_and_fills(
     init_db(isolated_database)
     _workspace_id, source = create_pdf_source()
     services = build_services()
-    services.pdf_forms.client = FakePdfClient()
+    fake_client = FakePdfClient()
+    services.pdf_forms.client = fake_client
+    services.pdf_forms.embedder = fake_client
+    services.pdf_forms.retriever.embedder = fake_client
     app = ProposalTuiApp(services)
 
     async with app.run_test(size=(140, 45)) as pilot:

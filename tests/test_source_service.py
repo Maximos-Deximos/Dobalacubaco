@@ -11,7 +11,11 @@ from app.application.source_service import (
 from app.application.workspace_service import WorkspaceService
 from app.config import get_settings
 from app.ingestion.models import FetchedResource
+from app.memory.chunk_repository import ChunkRepository
 from app.memory.database import init_db
+from app.memory.source_repository import SourceNotFoundError, SourceRepository
+from app.schemas.rag import ChunkDraft
+from app.schemas.source import SourceKind, SourceStatus
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ingestion"
 
@@ -166,3 +170,46 @@ def test_follows_pdf_links(isolated_database) -> None:
     assert len(result.children) == 1
     assert result.children[0].source_kind.value == "web_pdf"
     assert result.children[0].parent_source_id == result.source.id
+
+
+# Exclui a fonte, seus PDFs vinculados, trechos e arquivos locais.
+def test_delete_source_removes_tree_and_files(isolated_database) -> None:
+    service, workspace_id = make_service({})
+    ingestion = service.add_file(workspace_id, FIXTURES / "sample_edital.pdf")
+    source = ingestion.source
+
+    child = SourceRepository().create(
+        workspace_id=workspace_id,
+        source_kind=SourceKind.WEB_PDF,
+        parent_source_id=source.id,
+        title="PDF vinculado",
+        url="https://example.com/anexo.pdf",
+        status=SourceStatus.READY,
+    )
+    ChunkRepository().create_many(
+        workspace_id=workspace_id,
+        source_id=source.id,
+        drafts=[
+            ChunkDraft(
+                chunk_index=0,
+                text="Requisitos do edital.",
+                char_start=0,
+                char_end=21,
+                chunk_hash="hash-delete",
+            )
+        ],
+    )
+
+    source_dir = service.storage.source_dir(workspace_id, source.id)
+    assert source_dir.exists()
+
+    deleted = service.delete_source(source.id)
+
+    assert deleted.id == source.id
+    with pytest.raises(SourceNotFoundError):
+        service.get_source(source.id)
+    with pytest.raises(SourceNotFoundError):
+        service.get_source(child.id)
+    assert service.list_sources(workspace_id) == []
+    assert ChunkRepository().list_by_source(source.id) == []
+    assert not source_dir.exists()

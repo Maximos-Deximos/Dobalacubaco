@@ -137,6 +137,17 @@ class SourceIngestionService:
     def get_source(self, source_id: int):
         return self.source_repository.get_detail(source_id)
 
+    # Exclui uma fonte, seus PDFs vinculados, índice e arquivos locais.
+    def delete_source(self, source_id: int) -> Source:
+        tree = self.source_repository.list_tree(source_id)
+        deleted = self.source_repository.delete(source_id)
+
+        # Remove os arquivos de cada fonte da árvore já apagada do banco.
+        for source in tree:
+            self.storage.delete_source(source.workspace_id, source.id)
+
+        return deleted
+
     # Executa a extração e persistência de um recurso já baixado.
     def _ingest_resource(
         self,

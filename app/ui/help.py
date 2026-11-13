@@ -36,7 +36,7 @@ HELP_ENTRIES: tuple[CommandHelp, ...] = (
     ),
     CommandHelp(
         name="doctor",
-        summary="verifica configuração, banco, Ollama e Playwright",
+        summary="verifica configuração, banco, provedor de IA e Playwright",
         usage="doctor",
         examples=("doctor",),
     ),

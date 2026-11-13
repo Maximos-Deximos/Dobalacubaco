@@ -289,6 +289,37 @@ async def test_tui_adds_local_source(isolated_database: str) -> None:
         assert table.get_row_at(0)[3] == "Pronta"
 
 
+# Exclui uma fonte pela aba de fontes, com confirmação.
+@pytest.mark.asyncio
+async def test_tui_deletes_source(isolated_database: str) -> None:
+    workspace_id, _ = _prepare_data(isolated_database)
+    app = _build_app()
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        tabs = app.screen.query_one("#workspace-tabs", TabbedContent)
+        tabs.active = "tab-sources"
+        await pilot.pause()
+
+        sources = app.screen.query_one(SourcesPane)
+        await sources._after_add_file(str(FIXTURES / "sample_edital.pdf"))
+        await pilot.pause()
+
+        table = sources.query_one("#sources-table", DataTable)
+        assert table.row_count == 1
+
+        await pilot.press("d")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.click("#yes", offset=(1, 1))
+        await pilot.pause()
+
+        assert table.row_count == 0
+        assert app.services.sources.list_sources(workspace_id) == []
+
+
 # Envia uma pergunta usando um agente simulado.
 @pytest.mark.asyncio
 async def test_tui_chat_sends_question(
