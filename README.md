@@ -7,33 +7,32 @@ todo: adicionar objetivo/resumo do projeto
 
 todo: add objetivo
 
-# Requirements
+# Requisitos
 
 - Olamma
 - Python3
 
-Todo: add requirements conforme eles vem chegando
-# Installation
+# Instalação
 
 git clone (https://github.com/Maximos-Deximos/projeto)
 
-## Ollama Setup
+## Configuração do Ollama
 
-- Install module qwen3.5:4b
+- Instalar modulo qwen3.5:4b
 
-## Configure enviroment
+## Configurar ambiente
 
-- make a '.env' file at the root of the directory
-- Populate '.env' with '.env.example'
+- fazer arquivo '.env' na raiz do projeto
+- popular '.env' com os conteudos em '.env.example'
 
-## Configure virtual enviroment
+## Configurar ambiente virtual
 cd local/do/projeto
 
 Create virtual enviroment
 ```text
 python3 -m venv .venv
 ```
-### Enter the virtual enviroment:
+### Entrar no ambiente virtual
 Bash/zsh
 ```text
 source .venv/bin/activate
@@ -54,15 +53,69 @@ PowerShell
 ```text
 PS C:\> <venv>\Scripts\Activate.ps1
 ```
-### Install dependencies
+### Instalar dependências
 ```text
 pip install -r requirements.txt
 ```
 
-## Usage
+## Usagem
 
-- Run `python3 -m app.main` on the virtual enviroment for TUI
+- Rodar `python3 -m app.main` no ambiente virtual para o TUI
 
-Tradução em docs/development
+# Fluxo da aplicação
 
-Todo: add guia de utilização do software
+```text
++--------------------------------------------------+
+|                    USUARIO                       |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|                   INTERFACE                      | 
+|                                                  |
+|  - Enviar URL de website                         |
+|  - Providenciar Instruções                       |
+|  - Gerenciamento de informações de usuario       |
+|  - Revisão de funcionamento de agente            |
+|  - Aprovação e envio de edital                   |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|            CONTROLADOR DE AGENTE                 |
+|                                                  |
+|  - Recebe instruções de usuario                  |
+|  - Gerencia fluxo de execução                    |
+|  - Cordenação de componentes                     |
+|  - Controle de estados de execução               |
++--------------------------------------------------+
+          |                |               |
+          v                v               v
++----------------+ +---------------+ +----------------+
+|     AGENTE     | |    MEMORIA    | |   SEGURANÇA    |
+|                | |               | |                |
+|    Ollama      | |    SQLite     | | Validação      |
+|                | |               | | Permissões     |
+| Raciocino      | | Dados         | | Restrições     |
+| Mapeamento     | | Histórico     | | Aprovações     |
++----------------+ +---------------+ +----------------+
+          |
+          v
++--------------------------------------------------+
+|              AUTOMAÇÃO DE NAVEGADOR              |
+|                                                  |
+|                 Agente_editais                   |
+|                                                  |
+|  - Contextualização                              |
+|  - Sugestoões                                    |
+|  - Chat                                          |
+|  - Edição de pdf                                 |
+|  - Verificação de propostas (coesão/sintaxe)     |
++--------------------------------------------------+
+                       |
+                       v
++--------------------------------------------------+
+|                    USUÁRIO                       |
++--------------------------------------------------+
+```
+todo: NOME!
